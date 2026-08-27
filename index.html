@@ -577,32 +577,15 @@ button {
 }
 .bogo-banner #dismissBogoBanner { margin-left: auto; }
 
-.bogo-bulk-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 14px;
+.bogo-group { margin-bottom: 20px; }
+.bogo-group-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin: 0 0 8px 2px;
 }
-.bogo-bulk-form textarea {
-  padding: 9px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 0.9rem;
-  font-family: inherit;
-  resize: vertical;
-}
-.bogo-bulk-form button {
-  align-self: flex-start;
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 18px;
-  font-weight: 600;
-}
-.bogo-bulk-form button:hover { background: var(--accent-dark); }
 
 .bogo-item-note {
   font-size: 0.8rem;
@@ -760,22 +743,11 @@ button {
   </div>
 
   <div id="bogoPanel" hidden>
-    <p class="subtitle">Publix doesn't publish a public BOGO feed, so paste this week's deals in yourself — I'll handle the rest.</p>
+    <p class="subtitle">This week's Publix BOGO deals, grouped by department.</p>
     <p id="bogoRefreshBanner" class="bogo-banner" hidden>
-      🔄 It's BOGO refresh day — check the Publix app for this week's deals and update your list below.
+      🔄 It's BOGO refresh day — ask me to pull this week's deals.
       <button id="dismissBogoBanner" class="ghost-btn" type="button">Dismiss</button>
     </p>
-
-    <form id="bogoBulkForm" class="bogo-bulk-form">
-      <textarea id="bogoBulkInput" rows="3" placeholder="Paste BOGO items, one per line — e.g.&#10;Chicken breast&#10;Ben & Jerry's ice cream&#10;Cheerios"></textarea>
-      <button type="submit">Add All</button>
-    </form>
-
-    <form id="bogoForm" class="shopping-form">
-      <input type="text" id="bogoName" placeholder="Or add one item..." required>
-      <input type="text" id="bogoNote" placeholder="Note (optional)">
-      <button type="submit">Add</button>
-    </form>
 
     <div class="recipe-actions" style="margin-top:8px;">
       <button id="bogoMealPrepBtn" type="button">🍳 Generate Meal Prep Ideas</button>
@@ -784,7 +756,7 @@ button {
     <div id="bogoMealPrepResults"></div>
 
     <div class="list-section" style="margin-top:20px;">
-      <p id="bogoEmptyState" class="empty-state" hidden>No BOGO items yet. Paste or add this week's deals above.</p>
+      <p id="bogoEmptyState" class="empty-state" hidden>No BOGO items yet — ask me to pull this week's deals.</p>
       <div id="bogoListContainer" class="shopping-list"></div>
     </div>
     <button id="clearBogoBtn" class="ghost-btn" type="button" style="margin-top:14px;">Clear entire list</button>
@@ -1053,6 +1025,67 @@ const FIREBASE_CONFIG = {
   }
 
   global.StoreSections = { lookup, SECTION_ORDER, LOCATION_OPTIONS };
+})(window);
+</script>
+
+<script>
+/*
+ * Best-effort department guess for BOGO deal items, modeled loosely on
+ * Publix's own weekly-ad category taxonomy. Used only to group/sort the
+ * BOGO list — not stored, so it re-evaluates fresh each time.
+ */
+(function (global) {
+  "use strict";
+
+  const CATEGORY_ORDER = [
+    "Produce", "Deli", "Bakery", "Meat", "Seafood", "Dairy", "Frozen Food",
+    "Beverages", "Beer & Wine", "Liquor", "Health & Nutrition", "Baby",
+    "Beauty & Personal Care", "Pet", "Housewares", "Non-Foods", "Grocery"
+  ];
+
+  const ENTRIES = [
+    { keywords: ["apple", "banana", "orange", "lemon", "lime", "grape", "berry", "melon", "cucumber", "garlic", "onion", "potato", "tomato", "lettuce", "avocado", "mushroom", "pepper", "squash", "carrot", "celery", "broccoli", "cauliflower", "kale", "spinach", "cabbage", "ginger"], category: "Produce" },
+    { keywords: ["deli", "charcuterie", "pepperoni", "salami", "brie", "gorgonzola", "parmigiano", "camembert", "prosciutto", "lunch meat"], category: "Deli" },
+    { keywords: ["bread", "bagel", "croissant", "muffin", "cheesecake", "pound cake", "loaf cake", "bun", "roll"], category: "Bakery" },
+    { keywords: ["chicken", "turkey burger", "beef", "pork", "steak", "bacon", "sausage", "meatball", "hot dog", "frank", "kielbasa", "corn dog", "ground turkey", "ham"], category: "Meat" },
+    { keywords: ["shrimp", "salmon", "tuna", "crab", "lobster", "tilapia", "cod", "scallop", "fish"], category: "Seafood" },
+    { keywords: ["milk", "cheese", "yogurt", "yoghurt", "cream", "butter", "egg", "kefir"], category: "Dairy" },
+    { keywords: ["ice cream", "gelato", "sorbet", "frozen", "waffle", "hashbrown", "french fried potato", "pizza", "hot pocket", "skillet meal", "popsicle", "ice pop", "tater tot", "frittata", "entrée"], category: "Frozen Food" },
+    { keywords: ["water", "juice", "soda", "coffee", "tea", "sparkling", "gatorade", "smoothie", "punch", "k-cup", "hydration"], category: "Beverages" },
+    { keywords: ["wine", "cabernet", "chardonnay", "merlot", "pinot", "brewing co", "beer", "wicked apple", "ale"], category: "Beer & Wine" },
+    { keywords: ["vodka", "whiskey", "bourbon", "rum", "tequila", "liqueur", "scotch"], category: "Liquor" },
+    { keywords: ["protein", "supplement", "vitamin", "probiotic", "fiber cereal", "electrolyte"], category: "Health & Nutrition" },
+    { keywords: ["baby", "diaper", "newborn", "infant"], category: "Baby" },
+    { keywords: ["shampoo", "conditioner", "deodorant", "razor", "toothpaste", "toothbrush", "lotion", "sunscreen", "acne"], category: "Beauty & Personal Care" },
+    { keywords: ["dog", "cat", "pet", "kibble", "flea", "tick"], category: "Pet" },
+    { keywords: ["candle", "light bulb", "night light", "lighter", "plastic cup", "napkin"], category: "Housewares" },
+    { keywords: ["detergent", "dish liquid", "dish soap", "disinfect", "stain remover", "drain", "insecticide", "trash bag", "sponge", "cleaner", "aluminum foil", "wipes"], category: "Non-Foods" }
+  ];
+
+  function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  const KEYWORD_MAP = new Map();
+  ENTRIES.forEach(entry => {
+    entry.keywords.forEach(kw => KEYWORD_MAP.set(kw, entry.category));
+  });
+  // Word-boundary matches only, longest keyword wins — plain substring
+  // matching produced false positives like "pepper" inside "Pepperidge"
+  // or "ale" inside "Valencia".
+  const COMPILED = Array.from(KEYWORD_MAP.keys())
+    .sort((a, b) => b.length - a.length)
+    .map(kw => ({ kw, re: new RegExp("\\b" + escapeRegExp(kw) + "s?\\b", "i") }));
+
+  function lookup(name) {
+    if (!name) return "Grocery";
+    for (const { kw, re } of COMPILED) {
+      if (re.test(name)) return KEYWORD_MAP.get(kw);
+    }
+    return "Grocery";
+  }
+
+  global.BogoCategories = { lookup, CATEGORY_ORDER };
 })(window);
 </script>
 
@@ -2250,11 +2283,6 @@ if ("serviceWorker" in navigator) {
 (function () {
   "use strict";
 
-  const bulkForm = document.getElementById("bogoBulkForm");
-  const bulkInput = document.getElementById("bogoBulkInput");
-  const singleForm = document.getElementById("bogoForm");
-  const nameInput = document.getElementById("bogoName");
-  const noteInput = document.getElementById("bogoNote");
   const listContainer = document.getElementById("bogoListContainer");
   const emptyState = document.getElementById("bogoEmptyState");
   const clearBtn = document.getElementById("clearBogoBtn");
@@ -2276,10 +2304,6 @@ if ("serviceWorker" in navigator) {
     }[ch]));
   }
 
-  function genId() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  }
-
   function todayStr() {
     const d = new Date();
     return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -2296,6 +2320,28 @@ if ("serviceWorker" in navigator) {
     banner.hidden = true;
   });
 
+  function renderRow(item) {
+    const row = document.createElement("div");
+    row.className = "shopping-item";
+    row.innerHTML = `
+      <span class="shopping-item-name">${escapeHtml(item.name)}</span>
+      ${item.note ? `<span class="bogo-item-note">${escapeHtml(item.note)}</span>` : ""}
+      <button type="button" class="icon-btn" title="Add to shopping list">+ Shopping List</button>
+      <button type="button" class="icon-btn danger" title="Remove">✖</button>
+    `;
+    const buttons = row.querySelectorAll("button");
+    buttons[0].addEventListener("click", () => {
+      const added = window.ShoppingListModule && window.ShoppingListModule.addToShoppingList(item.name);
+      const gt = window.GroceryTracker;
+      if (added && gt) gt.showToast(`Added ${item.name} to your shopping list.`);
+    });
+    buttons[1].addEventListener("click", () => {
+      if (!bogoCol) return;
+      bogoCol.doc(item.id).delete().catch(() => {});
+    });
+    return row;
+  }
+
   function render() {
     if (bogoItems.length === 0) {
       listContainer.innerHTML = "";
@@ -2304,56 +2350,37 @@ if ("serviceWorker" in navigator) {
     }
     emptyState.hidden = true;
     listContainer.innerHTML = "";
-    [...bogoItems].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
-      const row = document.createElement("div");
-      row.className = "shopping-item";
-      row.innerHTML = `
-        <span class="shopping-item-name">${escapeHtml(item.name)}</span>
-        ${item.note ? `<span class="bogo-item-note">${escapeHtml(item.note)}</span>` : ""}
-        <button type="button" class="icon-btn" title="Add to shopping list">+ Shopping List</button>
-        <button type="button" class="icon-btn danger" title="Remove">✖</button>
-      `;
-      const buttons = row.querySelectorAll("button");
-      buttons[0].addEventListener("click", () => {
-        const added = window.ShoppingListModule && window.ShoppingListModule.addToShoppingList(item.name);
-        const gt = window.GroceryTracker;
-        if (added && gt) gt.showToast(`Added ${item.name} to your shopping list.`);
-      });
-      buttons[1].addEventListener("click", () => {
-        if (!bogoCol) return;
-        bogoCol.doc(item.id).delete().catch(() => {});
-      });
-      listContainer.appendChild(row);
+
+    const categoryOrder = (window.BogoCategories && window.BogoCategories.CATEGORY_ORDER) || [];
+    const groups = new Map();
+    bogoItems.forEach(item => {
+      const cat = (window.BogoCategories && window.BogoCategories.lookup(item.name)) || "Grocery";
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat).push(item);
+    });
+
+    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+      const ia = categoryOrder.indexOf(a), ib = categoryOrder.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+
+    sortedKeys.forEach(cat => {
+      const groupEl = document.createElement("div");
+      groupEl.className = "bogo-group";
+
+      const titleEl = document.createElement("h2");
+      titleEl.className = "bogo-group-title";
+      titleEl.textContent = `${cat} (${groups.get(cat).length})`;
+      groupEl.appendChild(titleEl);
+
+      const listEl = document.createElement("div");
+      listEl.className = "shopping-list";
+      groups.get(cat).sort((a, b) => a.name.localeCompare(b.name)).forEach(item => listEl.appendChild(renderRow(item)));
+      groupEl.appendChild(listEl);
+
+      listContainer.appendChild(groupEl);
     });
   }
-
-  function addItem(name, note) {
-    if (!name || !bogoCol) return;
-    const newItem = { id: genId(), name, note: note || "", addedAt: new Date().toISOString() };
-    bogoCol.doc(newItem.id).set(newItem).catch(() => {});
-  }
-
-  bulkForm.addEventListener("submit", e => {
-    e.preventDefault();
-    const lines = bulkInput.value.split("\n").map(l => l.trim()).filter(Boolean);
-    const existingNames = new Set(bogoItems.map(i => i.name.toLowerCase()));
-    lines.forEach(line => {
-      if (!existingNames.has(line.toLowerCase())) {
-        addItem(line, "");
-        existingNames.add(line.toLowerCase());
-      }
-    });
-    bulkForm.reset();
-  });
-
-  singleForm.addEventListener("submit", e => {
-    e.preventDefault();
-    const name = nameInput.value.trim();
-    if (!name) return;
-    addItem(name, noteInput.value.trim());
-    singleForm.reset();
-    nameInput.focus();
-  });
 
   clearBtn.addEventListener("click", () => {
     if (!dbRef || bogoItems.length === 0) return;
