@@ -1,4 +1,4 @@
-const CACHE_NAME = "grocery-tracker-v1";
+const CACHE_NAME = "grocery-tracker-v2";
 const PRECACHE_URLS = ["./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", event => {
@@ -18,11 +18,12 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
-  // Network-first for the page itself so app updates are picked up quickly;
-  // fall back to the cached shell when offline.
+  // Network-first for the page itself, bypassing HTTP cache entirely, so
+  // app updates are always picked up on the next load; fall back to the
+  // cached shell only when actually offline.
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("./index.html"))
+      fetch(event.request, { cache: "no-store" }).catch(() => caches.match("./index.html"))
     );
     return;
   }
