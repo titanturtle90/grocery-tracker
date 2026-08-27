@@ -3,26 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grocery Tracker</title>
+<title>Nexpire</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#3f7d4f">
+<meta name="theme-color" content="#16a34a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Groceries">
+<meta name="apple-mobile-web-app-title" content="Nexpire">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #f6f7f5;
+  --bg: #f4f6f4;
   --surface: #ffffff;
-  --border: #e3e6e1;
-  --text: #232823;
-  --text-muted: #6b7268;
-  --accent: #3f7d4f;
-  --accent-dark: #2e5e3a;
+  --surface-2: #eef1ee;
+  --border: #e2e6e2;
+  --text: #14181a;
+  --text-muted: #667066;
+  --accent: #16a34a;
+  --accent-dark: #15803d;
+  --accent-soft: #dcfce7;
+  --accent-rgb: 22, 163, 74;
 
   --expired-bg: #fdecea;
-  --expired-fg: #b3261e;
+  --expired-fg: #c0281f;
   --expired-border: #f3c6c1;
 
   --today-bg: #fff1e0;
@@ -37,37 +43,45 @@
   --fresh-fg: #2e6b3a;
   --fresh-border: #bfe0c4;
 
-  --radius: 10px;
-  --shadow: 0 1px 3px rgba(20, 30, 20, 0.08), 0 1px 2px rgba(20, 30, 20, 0.06);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(20, 30, 20, 0.04), 0 8px 24px -10px rgba(20, 30, 20, 0.16);
+  --shadow-lg: 0 4px 12px rgba(20, 30, 20, 0.06), 0 16px 40px -12px rgba(20, 30, 20, 0.22);
+  --font-heading: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #171a17;
-    --surface: #202420;
-    --border: #2e332e;
-    --text: #e9ece8;
-    --text-muted: #9aa39a;
-    --accent: #59a86c;
-    --accent-dark: #6fc282;
+    --bg: #0d1210;
+    --surface: #161c19;
+    --surface-2: #1d2420;
+    --border: #29332d;
+    --text: #edf2ee;
+    --text-muted: #93a196;
+    --accent: #4ade80;
+    --accent-dark: #22c55e;
+    --accent-soft: #17301f;
+    --accent-rgb: 74, 222, 128;
 
-    --expired-bg: #3a1e1c;
+    --expired-bg: #34191a;
     --expired-fg: #ff8a80;
-    --expired-border: #5c2d29;
+    --expired-border: #522324;
 
-    --today-bg: #3a2a15;
+    --today-bg: #332310;
     --today-fg: #ffb066;
-    --today-border: #5c4321;
+    --today-border: #513a17;
 
-    --soon-bg: #34301a;
+    --soon-bg: #2e2a14;
     --soon-fg: #e8cf5e;
-    --soon-border: #524b28;
+    --soon-border: #494322;
 
-    --fresh-bg: #1c3220;
+    --fresh-bg: #17281c;
     --fresh-fg: #7fd18f;
-    --fresh-border: #2c4d33;
+    --fresh-border: #25402c;
 
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -10px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.35), 0 20px 48px -16px rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -75,15 +89,16 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-body);
   background: var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
 .app {
   max-width: 900px;
   margin: 0 auto;
-  padding: 24px 16px 64px;
+  padding: 28px 18px 72px;
 }
 
 .app-header {
@@ -92,17 +107,40 @@ body {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  border-radius: 13px;
+  background: linear-gradient(155deg, var(--accent), var(--accent-dark));
+  box-shadow: 0 4px 14px -4px rgba(var(--accent-rgb), 0.55);
 }
 
 .app-header h1 {
-  margin: 0 0 4px;
-  font-size: 1.6rem;
+  margin: 0 0 2px;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
-  margin: 0 0 20px;
+  margin: 0;
   color: var(--text-muted);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
 }
 
 .sync-status {
@@ -124,6 +162,7 @@ body {
   flex-wrap: wrap;
 }
 #notifyBtn.enabled { color: var(--accent); border-color: var(--accent); }
+.ghost-btn.enabled { color: var(--expired-fg); border-color: var(--expired-border); }
 
 .summary-bar {
   display: grid;
@@ -143,7 +182,7 @@ body {
 }
 .summary-pill:hover { filter: brightness(0.97); }
 .summary-pill.active { outline: 2px solid var(--accent); outline-offset: 1px; }
-.summary-pill .count { display: block; font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
+.summary-pill .count { display: block; font-family: var(--font-heading); font-size: 1.5rem; font-weight: 800; line-height: 1.2; }
 .summary-pill .label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
 
 .summary-pill.expired { background: var(--expired-bg); color: var(--expired-fg); border-color: var(--expired-border); }
@@ -191,35 +230,41 @@ body {
 .field label { font-size: 0.75rem; color: var(--text-muted); }
 
 input[type="text"], input[type="date"], select {
-  padding: 9px 10px;
+  padding: 9px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
   font-size: 0.9rem;
   width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 input:focus, select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 0;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
 }
 
 button {
   cursor: pointer;
   font-size: 0.9rem;
+  font-family: inherit;
 }
 
 .field-submit button, .add-form > button {
   background: var(--accent);
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 10px 16px;
-  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  font-weight: 700;
   white-space: nowrap;
+  box-shadow: 0 2px 8px -2px rgba(var(--accent-rgb), 0.5);
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
-.field-submit button:hover { background: var(--accent-dark); }
+.field-submit button:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 4px 12px -2px rgba(var(--accent-rgb), 0.55); }
+.field-submit button:active { transform: translateY(0); }
 
 .controls {
   display: flex;
@@ -234,10 +279,12 @@ button {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-muted);
-  border-radius: 8px;
-  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-weight: 600;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
-.ghost-btn:hover { border-color: var(--accent); color: var(--accent); }
+.ghost-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
 .group {
   margin-bottom: 22px;
@@ -247,11 +294,12 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.85rem;
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0 0 8px 2px;
+  letter-spacing: 0.05em;
+  margin: 0 0 10px 2px;
 }
 
 .group-title .dot {
@@ -274,11 +322,13 @@ button {
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 4px solid;
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
   margin-bottom: 8px;
   box-shadow: var(--shadow);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
+.item-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
 
 .item-card.expired { border-left-color: var(--expired-fg); }
 .item-card.today { border-left-color: var(--today-fg); }
@@ -291,7 +341,8 @@ button {
 }
 
 .item-name {
-  font-weight: 600;
+  font-family: var(--font-heading);
+  font-weight: 700;
   font-size: 0.98rem;
   margin-bottom: 2px;
   overflow: hidden;
@@ -334,13 +385,15 @@ button {
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
-  border-radius: 6px;
-  padding: 6px 9px;
+  border-radius: 8px;
+  padding: 6px 10px;
   font-size: 0.85rem;
+  font-weight: 600;
   line-height: 1;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
-.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
-.icon-btn.danger:hover { border-color: var(--expired-fg); color: var(--expired-fg); }
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.icon-btn.danger:hover { border-color: var(--expired-fg); color: var(--expired-fg); background: var(--expired-bg); }
 
 .empty-state {
   text-align: center;
@@ -383,23 +436,34 @@ button {
 
 .tab-bar {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--border);
+  gap: 4px;
+  margin: 20px 0 24px;
+  padding: 5px;
+  background: var(--surface-2);
+  border-radius: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.tab-bar::-webkit-scrollbar { display: none; }
 .tab-btn {
   background: transparent;
   border: none;
-  border-bottom: 3px solid transparent;
-  padding: 10px 4px;
-  margin-bottom: -1px;
-  font-size: 0.95rem;
-  font-weight: 600;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-family: var(--font-heading);
+  font-size: 0.88rem;
+  font-weight: 700;
   color: var(--text-muted);
   cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
-.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-.tab-btn:hover { color: var(--accent); }
+.tab-btn.active {
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(20, 30, 20, 0.08), 0 1px 6px rgba(20, 30, 20, 0.06);
+}
+.tab-btn:not(.active):hover { color: var(--text); }
 
 .recipe-checklist {
   display: flex;
@@ -527,15 +591,18 @@ button {
 .shopping-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px 12px;
   box-shadow: var(--shadow);
 }
 .shopping-item input[type="checkbox"] { width: 20px; height: 20px; flex-shrink: 0; cursor: pointer; }
-.shopping-item-name { flex: 1; font-weight: 600; font-size: 0.95rem; }
+.shopping-item-name { flex: 1; min-width: 100px; font-family: var(--font-heading); font-weight: 700; font-size: 0.95rem; }
+.shopping-item .icon-btn { flex-shrink: 0; white-space: nowrap; }
+.bogo-add-btn { min-width: 128px; text-align: center; }
 .shopping-item-qty { font-size: 0.8rem; color: var(--text-muted); background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
 
 .shopping-item-location {
@@ -576,6 +643,7 @@ button {
   flex-wrap: wrap;
   margin-bottom: 16px;
 }
+.bogo-banner[hidden] { display: none; }
 .bogo-banner #dismissBogoBanner { margin-left: auto; }
 
 .bogo-group { margin-bottom: 20px; }
@@ -586,15 +654,6 @@ button {
   letter-spacing: 0.04em;
   color: var(--accent);
   margin: 0 0 8px 2px;
-}
-
-.bogo-item-note {
-  font-size: 0.8rem;
-  color: var(--accent);
-  background: var(--fresh-bg);
-  border: 1px solid var(--fresh-border);
-  border-radius: 999px;
-  padding: 1px 8px;
 }
 
 #bogoMealPrepBtn {
@@ -645,6 +704,45 @@ button {
 }
 .pairing-card button:hover { border-color: var(--accent); color: var(--accent); }
 
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.batch-bar[hidden] { display: none; }
+.batch-bar span { font-size: 0.85rem; font-weight: 600; color: var(--accent); }
+.batch-bar select { width: auto; min-width: 130px; }
+.batch-bar button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.batch-bar button:hover { background: var(--accent-dark); }
+.batch-bar button.icon-btn.danger {
+  background: transparent;
+  color: var(--expired-fg);
+  border: 1px solid var(--expired-border);
+}
+.batch-bar button.icon-btn.danger:hover { background: var(--expired-bg); }
+.batch-bar button.ghost-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.select-checkbox { width: 20px; height: 20px; flex-shrink: 0; cursor: pointer; margin-right: 2px; }
+
 @media (max-width: 700px) {
   .add-form { grid-template-columns: 1fr 1fr; }
   .field-storage { grid-column: span 1; }
@@ -660,9 +758,12 @@ button {
 <div class="app">
 
   <header class="app-header">
-    <div>
-      <h1>🥕 Grocery Tracker</h1>
-      <p class="subtitle">Track what you have. Eat it before it's gone.</p>
+    <div class="brand">
+      <span class="brand-mark">🥕</span>
+      <div>
+        <h1>Nexpire</h1>
+        <p class="subtitle">Track what you have. Eat it before it's gone.</p>
+      </div>
     </div>
     <div class="header-actions">
       <button id="notifyBtn" class="ghost-btn" type="button" hidden>🔔 Enable alerts</button>
@@ -742,7 +843,18 @@ button {
       <option value="">All locations</option>
     </select>
     <button id="clearFilters" class="ghost-btn" type="button">Clear filters</button>
+    <button id="toggleGrocerySelect" class="ghost-btn" type="button">☑️ Select</button>
   </section>
+
+  <div id="groceryBatchBar" class="batch-bar" hidden>
+    <span id="groceryBatchCount">0 selected</span>
+    <select id="batchCategorySelect"></select>
+    <button id="applyBatchCategory" type="button">Set Category</button>
+    <select id="batchStorageSelect"></select>
+    <button id="applyBatchStorage" type="button">Set Location</button>
+    <button id="batchRemove" class="icon-btn danger" type="button">Remove Selected</button>
+    <button id="batchCancel" class="ghost-btn" type="button">Done</button>
+  </div>
 
   <section class="list-section">
     <p id="emptyState" class="empty-state" hidden>No groceries yet. Add something above to get started.</p>
@@ -758,6 +870,19 @@ button {
       <input type="text" id="shoppingQty" placeholder="Qty (optional)">
       <button type="submit">Add</button>
     </form>
+
+    <div class="recipe-actions">
+      <button id="toggleShoppingSelect" class="ghost-btn" type="button">☑️ Select</button>
+    </div>
+
+    <div id="shoppingBatchBar" class="batch-bar" hidden>
+      <span id="shoppingBatchCount">0 selected</span>
+      <select id="shoppingBatchLocationSelect"></select>
+      <button id="applyShoppingBatchLocation" type="button">Set Location</button>
+      <button id="shoppingBatchRemove" class="icon-btn danger" type="button">Remove Selected</button>
+      <button id="shoppingBatchCancel" class="ghost-btn" type="button">Done</button>
+    </div>
+
     <div class="list-section">
       <p id="shoppingEmptyState" class="empty-state" hidden>Your shopping list is empty. Add something above.</p>
       <div id="shoppingListContainer" class="shopping-list"></div>
@@ -1370,7 +1495,7 @@ const FIREBASE_CONFIG = {
     const body = `${names}${extra} — expired or due today.`;
 
     navigator.serviceWorker.ready.then(reg => {
-      reg.showNotification("Grocery Tracker", {
+      reg.showNotification("Nexpire", {
         body,
         icon: "icon-192.png",
         badge: "icon-192.png",
@@ -1473,6 +1598,19 @@ const FIREBASE_CONFIG = {
   const storageFilter = document.getElementById("storageFilter");
   const clearFiltersBtn = document.getElementById("clearFilters");
 
+  const toggleSelectBtn = document.getElementById("toggleGrocerySelect");
+  const batchBar = document.getElementById("groceryBatchBar");
+  const batchCountEl = document.getElementById("groceryBatchCount");
+  const batchCategorySelect = document.getElementById("batchCategorySelect");
+  const applyBatchCategoryBtn = document.getElementById("applyBatchCategory");
+  const batchStorageSelect = document.getElementById("batchStorageSelect");
+  const applyBatchStorageBtn = document.getElementById("applyBatchStorage");
+  const batchRemoveBtn = document.getElementById("batchRemove");
+  const batchCancelBtn = document.getElementById("batchCancel");
+
+  let selectMode = false;
+  let selectedIds = new Set();
+
   const groupsContainer = document.getElementById("groupsContainer");
   const emptyState = document.getElementById("emptyState");
   const summaryBar = document.getElementById("summaryBar");
@@ -1565,6 +1703,7 @@ const FIREBASE_CONFIG = {
     card.dataset.id = item.id;
 
     card.innerHTML = `
+      ${selectMode ? `<input type="checkbox" class="select-checkbox" ${selectedIds.has(item.id) ? "checked" : ""}>` : ""}
       <div class="item-main">
         <div class="item-name">${escapeHtml(item.name)}</div>
         <div class="item-meta">
@@ -1581,6 +1720,14 @@ const FIREBASE_CONFIG = {
         <button class="icon-btn danger remove-btn" title="Remove item">✖</button>
       </div>
     `;
+
+    if (selectMode) {
+      card.querySelector(".select-checkbox").addEventListener("change", e => {
+        if (e.target.checked) selectedIds.add(item.id);
+        else selectedIds.delete(item.id);
+        updateBatchBar();
+      });
+    }
 
     card.querySelector(".eat-btn").addEventListener("click", () => removeItem(item.id, "eaten"));
     card.querySelector(".remove-btn").addEventListener("click", () => removeItem(item.id, "removed"));
@@ -1861,6 +2008,64 @@ const FIREBASE_CONFIG = {
     renderList();
   });
 
+  // ---------- batch select ----------
+
+  function updateBatchBar() {
+    batchBar.hidden = !selectMode || selectedIds.size === 0;
+    batchCountEl.textContent = `${selectedIds.size} selected`;
+  }
+
+  toggleSelectBtn.addEventListener("click", () => {
+    selectMode = !selectMode;
+    selectedIds.clear();
+    toggleSelectBtn.textContent = selectMode ? "✖ Cancel select" : "☑️ Select";
+    toggleSelectBtn.classList.toggle("enabled", selectMode);
+    updateBatchBar();
+    renderList();
+  });
+
+  batchCancelBtn.addEventListener("click", () => {
+    selectMode = false;
+    selectedIds.clear();
+    toggleSelectBtn.textContent = "☑️ Select";
+    toggleSelectBtn.classList.remove("enabled");
+    updateBatchBar();
+    renderList();
+  });
+
+  applyBatchCategoryBtn.addEventListener("click", () => {
+    if (!itemsCol || selectedIds.size === 0) return;
+    const value = batchCategorySelect.value;
+    const batch = firestoreDb.batch();
+    selectedIds.forEach(id => batch.set(itemsCol.doc(id), { category: value }, { merge: true }));
+    batch.commit()
+      .then(() => showToast(`Set category to "${value}" for ${selectedIds.size} item${selectedIds.size === 1 ? "" : "s"}.`))
+      .catch(() => showToast("Couldn't update — check your connection."));
+  });
+
+  applyBatchStorageBtn.addEventListener("click", () => {
+    if (!itemsCol || selectedIds.size === 0) return;
+    const value = batchStorageSelect.value;
+    const batch = firestoreDb.batch();
+    selectedIds.forEach(id => batch.set(itemsCol.doc(id), { storage: value }, { merge: true }));
+    batch.commit()
+      .then(() => showToast(`Set location to "${storageLabel(value)}" for ${selectedIds.size} item${selectedIds.size === 1 ? "" : "s"}.`))
+      .catch(() => showToast("Couldn't update — check your connection."));
+  });
+
+  batchRemoveBtn.addEventListener("click", () => {
+    if (!itemsCol || selectedIds.size === 0) return;
+    if (!confirm(`Remove ${selectedIds.size} selected item${selectedIds.size === 1 ? "" : "s"}?`)) return;
+    const batch = firestoreDb.batch();
+    const count = selectedIds.size;
+    selectedIds.forEach(id => batch.delete(itemsCol.doc(id)));
+    batch.commit()
+      .then(() => showToast(`Removed ${count} item${count === 1 ? "" : "s"}.`))
+      .catch(() => showToast("Couldn't remove — check your connection."));
+    selectedIds.clear();
+    updateBatchBar();
+  });
+
   // populate the storage dropdowns and give the date field a sensible default
   (function initAddForm() {
     itemStorageInput.innerHTML = ShelfLifeDB.STORAGE_OPTIONS.map(o =>
@@ -1870,6 +2075,11 @@ const FIREBASE_CONFIG = {
     itemExpiryInput.value = addDays(7);
 
     storageFilter.innerHTML = '<option value="">All locations</option>' + ShelfLifeDB.STORAGE_OPTIONS.map(o =>
+      `<option value="${o.value}">${o.icon} ${o.label}</option>`
+    ).join("");
+
+    batchCategorySelect.innerHTML = CATEGORIES.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    batchStorageSelect.innerHTML = ShelfLifeDB.STORAGE_OPTIONS.map(o =>
       `<option value="${o.value}">${o.icon} ${o.label}</option>`
     ).join("");
   })();
@@ -2245,9 +2455,19 @@ if ("serviceWorker" in navigator) {
   const emptyState = document.getElementById("shoppingEmptyState");
   const clearBtn = document.getElementById("clearShoppingBtn");
 
+  const toggleSelectBtn = document.getElementById("toggleShoppingSelect");
+  const batchBar = document.getElementById("shoppingBatchBar");
+  const batchCountEl = document.getElementById("shoppingBatchCount");
+  const batchLocationSelect = document.getElementById("shoppingBatchLocationSelect");
+  const applyBatchLocationBtn = document.getElementById("applyShoppingBatchLocation");
+  const batchRemoveBtn = document.getElementById("shoppingBatchRemove");
+  const batchCancelBtn = document.getElementById("shoppingBatchCancel");
+
   let shoppingItems = [];
   let shoppingCol = null;
   let dbRef = null;
+  let selectMode = false;
+  let selectedIds = new Set();
 
   const LOCATION_MEMORY_KEY = "grocery-tracker-item-locations-v1";
   const SECTION_ORDER = window.StoreSections ? window.StoreSections.SECTION_ORDER : [];
@@ -2358,13 +2578,22 @@ if ("serviceWorker" in navigator) {
     const row = document.createElement("div");
     row.className = "shopping-item";
     row.innerHTML = `
-      <input type="checkbox" title="Picked it up">
+      <input type="checkbox" ${selectMode ? (selectedIds.has(item.id) ? "checked" : "") : ""} title="${selectMode ? "Select" : "Picked it up"}">
       <span class="shopping-item-name">${escapeHtml(item.name)}</span>
       ${item.qty ? `<span class="shopping-item-qty">${escapeHtml(item.qty)}</span>` : ""}
       <span class="shopping-item-location ${item.location ? "" : "unset"}" title="Click to set location">${escapeHtml(item.location || "Location")}</span>
       <button type="button" class="icon-btn danger" title="Remove from list">✖</button>
     `;
-    row.querySelector("input[type=checkbox]").addEventListener("change", () => pickUp(item));
+
+    if (selectMode) {
+      row.querySelector("input[type=checkbox]").addEventListener("change", e => {
+        if (e.target.checked) selectedIds.add(item.id);
+        else selectedIds.delete(item.id);
+        updateBatchBar();
+      });
+    } else {
+      row.querySelector("input[type=checkbox]").addEventListener("change", () => pickUp(item));
+    }
     row.querySelector(".icon-btn").addEventListener("click", () => removeFromList(item));
 
     const locationBadge = row.querySelector(".shopping-item-location");
@@ -2452,7 +2681,62 @@ if ("serviceWorker" in navigator) {
     batch.commit().catch(() => {});
   });
 
+  // ---------- batch select ----------
+
+  function updateBatchBar() {
+    batchBar.hidden = !selectMode || selectedIds.size === 0;
+    batchCountEl.textContent = `${selectedIds.size} selected`;
+  }
+
+  toggleSelectBtn.addEventListener("click", () => {
+    selectMode = !selectMode;
+    selectedIds.clear();
+    toggleSelectBtn.textContent = selectMode ? "✖ Cancel select" : "☑️ Select";
+    toggleSelectBtn.classList.toggle("enabled", selectMode);
+    updateBatchBar();
+    render();
+  });
+
+  batchCancelBtn.addEventListener("click", () => {
+    selectMode = false;
+    selectedIds.clear();
+    toggleSelectBtn.textContent = "☑️ Select";
+    toggleSelectBtn.classList.remove("enabled");
+    updateBatchBar();
+    render();
+  });
+
+  applyBatchLocationBtn.addEventListener("click", () => {
+    if (!dbRef || selectedIds.size === 0) return;
+    const value = batchLocationSelect.value;
+    const batch = dbRef.batch();
+    selectedIds.forEach(id => {
+      batch.set(shoppingCol.doc(id), { location: value }, { merge: true });
+      const item = shoppingItems.find(i => i.id === id);
+      if (item) rememberLocation(item.name, value);
+    });
+    batch.commit()
+      .then(() => {
+        const gt = window.GroceryTracker;
+        if (gt) gt.showToast(`Set location for ${selectedIds.size} item${selectedIds.size === 1 ? "" : "s"}.`);
+      })
+      .catch(() => {});
+  });
+
+  batchRemoveBtn.addEventListener("click", () => {
+    if (!dbRef || selectedIds.size === 0) return;
+    if (!confirm(`Remove ${selectedIds.size} selected item${selectedIds.size === 1 ? "" : "s"}?`)) return;
+    const batch = dbRef.batch();
+    selectedIds.forEach(id => batch.delete(shoppingCol.doc(id)));
+    batch.commit().catch(() => {});
+    selectedIds.clear();
+    updateBatchBar();
+  });
+
   function init() {
+    batchLocationSelect.innerHTML = ((window.StoreSections && window.StoreSections.LOCATION_OPTIONS) || [])
+      .map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+
     const activeDb = window.GroceryTracker ? window.GroceryTracker.getDb() : null;
     if (!activeDb) {
       emptyState.hidden = false;
@@ -2529,8 +2813,7 @@ if ("serviceWorker" in navigator) {
     row.className = "shopping-item";
     row.innerHTML = `
       <span class="shopping-item-name">${escapeHtml(item.name)}</span>
-      ${item.note ? `<span class="bogo-item-note">${escapeHtml(item.note)}</span>` : ""}
-      <button type="button" class="icon-btn" title="Add to shopping list">+ Shopping List</button>
+      <button type="button" class="icon-btn bogo-add-btn" title="Add to shopping list">+ Shopping List</button>
       <button type="button" class="icon-btn danger" title="Remove">✖</button>
     `;
     const buttons = row.querySelectorAll("button");
