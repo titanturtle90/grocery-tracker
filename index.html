@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grocery Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3f7d4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Groceries">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" type="image/png">
 <style>
 :root {
   --bg: #f6f7f5;
@@ -1173,6 +1180,15 @@ const FIREBASE_CONFIG = {
   render();
   initFirebase();
 })();
+
+if ("serviceWorker" in navigator) {
+  const registerSW = () => navigator.serviceWorker.register("./sw.js").catch(err => console.error("SW registration failed", err));
+  if (document.readyState === "complete") {
+    registerSW();
+  } else {
+    window.addEventListener("load", registerSW);
+  }
+}
 </script>
 </body>
 </html>
