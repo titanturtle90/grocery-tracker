@@ -562,6 +562,68 @@ button {
   font-size: 0.78rem;
 }
 
+.bogo-banner {
+  background: var(--today-bg);
+  border: 1px solid var(--today-border);
+  color: var(--today-fg);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.bogo-banner #dismissBogoBanner { margin-left: auto; }
+
+.bogo-bulk-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.bogo-bulk-form textarea {
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+}
+.bogo-bulk-form button {
+  align-self: flex-start;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 600;
+}
+.bogo-bulk-form button:hover { background: var(--accent-dark); }
+
+.bogo-item-note {
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: var(--fresh-bg);
+  border: 1px solid var(--fresh-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+#bogoMealPrepBtn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 600;
+}
+#bogoMealPrepBtn:hover { background: var(--accent-dark); }
+#bogoMealPrepBtn:disabled { opacity: 0.6; cursor: default; }
+
 @media (max-width: 700px) {
   .add-form { grid-template-columns: 1fr 1fr; }
   .field-storage { grid-column: span 1; }
@@ -591,6 +653,7 @@ button {
     <button class="tab-btn active" data-tab="groceries" type="button">🛒 Groceries</button>
     <button class="tab-btn" data-tab="shopping" type="button">🛍️ Shopping List</button>
     <button class="tab-btn" data-tab="recipes" type="button">🍳 Recipes</button>
+    <button class="tab-btn" data-tab="bogo" type="button">🏷️ BOGOs</button>
   </nav>
 
   <div id="groceriesPanel">
@@ -694,6 +757,37 @@ button {
     </div>
     <div id="recipeResults"></div>
     <p class="recipe-status" style="margin-top:24px;">Recipes courtesy of <a href="https://www.themealdb.com" target="_blank" rel="noopener">TheMealDB</a>.</p>
+  </div>
+
+  <div id="bogoPanel" hidden>
+    <p class="subtitle">Publix doesn't publish a public BOGO feed, so paste this week's deals in yourself — I'll handle the rest.</p>
+    <p id="bogoRefreshBanner" class="bogo-banner" hidden>
+      🔄 It's BOGO refresh day — check the Publix app for this week's deals and update your list below.
+      <button id="dismissBogoBanner" class="ghost-btn" type="button">Dismiss</button>
+    </p>
+
+    <form id="bogoBulkForm" class="bogo-bulk-form">
+      <textarea id="bogoBulkInput" rows="3" placeholder="Paste BOGO items, one per line — e.g.&#10;Chicken breast&#10;Ben & Jerry's ice cream&#10;Cheerios"></textarea>
+      <button type="submit">Add All</button>
+    </form>
+
+    <form id="bogoForm" class="shopping-form">
+      <input type="text" id="bogoName" placeholder="Or add one item..." required>
+      <input type="text" id="bogoNote" placeholder="Note (optional)">
+      <button type="submit">Add</button>
+    </form>
+
+    <div class="recipe-actions" style="margin-top:8px;">
+      <button id="bogoMealPrepBtn" type="button">🍳 Generate Meal Prep Ideas</button>
+      <span id="bogoMealPrepStatus" class="recipe-status"></span>
+    </div>
+    <div id="bogoMealPrepResults"></div>
+
+    <div class="list-section" style="margin-top:20px;">
+      <p id="bogoEmptyState" class="empty-state" hidden>No BOGO items yet. Paste or add this week's deals above.</p>
+      <div id="bogoListContainer" class="shopping-list"></div>
+    </div>
+    <button id="clearBogoBtn" class="ghost-btn" type="button" style="margin-top:14px;">Clear entire list</button>
   </div>
 
 </div>
@@ -1575,6 +1669,7 @@ if ("serviceWorker" in navigator) {
   const groceriesPanel = document.getElementById("groceriesPanel");
   const shoppingPanel = document.getElementById("shoppingPanel");
   const recipesPanel = document.getElementById("recipesPanel");
+  const bogoPanel = document.getElementById("bogoPanel");
   const checklistEl = document.getElementById("recipeChecklist");
   const findBtn = document.getElementById("findRecipesBtn");
   const statusEl = document.getElementById("recipeStatus");
@@ -1604,6 +1699,7 @@ if ("serviceWorker" in navigator) {
     groceriesPanel.hidden = tab !== "groceries";
     shoppingPanel.hidden = tab !== "shopping";
     recipesPanel.hidden = tab !== "recipes";
+    bogoPanel.hidden = tab !== "bogo";
     if (tab === "recipes" && !checklistPopulated) {
       populateChecklist();
       loadCuisineOptions();
@@ -1791,22 +1887,22 @@ if ("serviceWorker" in navigator) {
     return list;
   }
 
-  function renderRecipes(recipes, unmatched) {
-    resultsEl.innerHTML = "";
+  function renderRecipes(container, recipes, unmatched) {
+    container.innerHTML = "";
 
     if (unmatched.length > 0) {
       const note = document.createElement("p");
       note.className = "recipe-status";
       note.style.marginBottom = "10px";
       note.textContent = `No recipe match found for: ${unmatched.join(", ")}.`;
-      resultsEl.appendChild(note);
+      container.appendChild(note);
     }
 
     if (recipes.length === 0) {
       const empty = document.createElement("p");
       empty.className = "empty-state";
       empty.textContent = "No recipes found for the selected items. Try selecting different ones.";
-      resultsEl.appendChild(empty);
+      container.appendChild(empty);
       return;
     }
 
@@ -1857,7 +1953,7 @@ if ("serviceWorker" in navigator) {
       grid.appendChild(card);
     });
 
-    resultsEl.appendChild(grid);
+    container.appendChild(grid);
   }
 
   findBtn.addEventListener("click", async () => {
@@ -1879,7 +1975,7 @@ if ("serviceWorker" in navigator) {
 
     try {
       const { recipes, unmatched } = await searchRecipes(selected, cuisine, excludeTerms);
-      renderRecipes(recipes, unmatched);
+      renderRecipes(resultsEl, recipes, unmatched);
       statusEl.textContent = recipes.length ? `Found ${recipes.length} recipe${recipes.length === 1 ? "" : "s"}.` : "";
     } catch (e) {
       console.error("Recipe search failed", e);
@@ -1896,6 +1992,8 @@ if ("serviceWorker" in navigator) {
       card.style.display = !term || title.includes(term) ? "" : "none";
     });
   });
+
+  window.RecipeSearch = { searchRecipes, renderRecipes };
 })();
 </script>
 
@@ -2087,18 +2185,24 @@ if ("serviceWorker" in navigator) {
     shoppingCol.doc(item.id).delete().catch(() => {});
   }
 
-  shoppingForm.addEventListener("submit", e => {
-    e.preventDefault();
-    const name = shoppingNameInput.value.trim();
-    if (!name || !shoppingCol) return;
+  function addToShoppingList(name, qty) {
+    if (!name || !shoppingCol) return false;
     const newItem = {
       id: genId(),
       name,
-      qty: shoppingQtyInput.value.trim(),
+      qty: qty || "",
       location: guessLocation(name),
       addedAt: new Date().toISOString()
     };
     shoppingCol.doc(newItem.id).set(newItem).catch(() => {});
+    return true;
+  }
+
+  shoppingForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = shoppingNameInput.value.trim();
+    if (!name || !shoppingCol) return;
+    addToShoppingList(name, shoppingQtyInput.value.trim());
     shoppingForm.reset();
     shoppingNameInput.focus();
   });
@@ -2131,6 +2235,181 @@ if ("serviceWorker" in navigator) {
         emptyState.hidden = false;
         emptyState.textContent = err.code === "permission-denied"
           ? "Can't sync — add a \"shoppingList\" rule in your Firestore rules (same as groceryItems)."
+          : "Sync error — check your connection.";
+      }
+    );
+  }
+
+  window.ShoppingListModule = { addToShoppingList: (name, qty) => addToShoppingList(name, qty) };
+
+  init();
+})();
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  const bulkForm = document.getElementById("bogoBulkForm");
+  const bulkInput = document.getElementById("bogoBulkInput");
+  const singleForm = document.getElementById("bogoForm");
+  const nameInput = document.getElementById("bogoName");
+  const noteInput = document.getElementById("bogoNote");
+  const listContainer = document.getElementById("bogoListContainer");
+  const emptyState = document.getElementById("bogoEmptyState");
+  const clearBtn = document.getElementById("clearBogoBtn");
+  const banner = document.getElementById("bogoRefreshBanner");
+  const dismissBannerBtn = document.getElementById("dismissBogoBanner");
+  const mealPrepBtn = document.getElementById("bogoMealPrepBtn");
+  const mealPrepStatus = document.getElementById("bogoMealPrepStatus");
+  const mealPrepResults = document.getElementById("bogoMealPrepResults");
+
+  const BANNER_DISMISS_KEY = "grocery-tracker-bogo-banner-dismissed";
+
+  let bogoItems = [];
+  let bogoCol = null;
+  let dbRef = null;
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[ch]));
+  }
+
+  function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  }
+
+  function checkBanner() {
+    const isThursday = new Date().getDay() === 4;
+    const dismissedToday = localStorage.getItem(BANNER_DISMISS_KEY) === todayStr();
+    banner.hidden = !(isThursday && !dismissedToday);
+  }
+
+  dismissBannerBtn.addEventListener("click", () => {
+    localStorage.setItem(BANNER_DISMISS_KEY, todayStr());
+    banner.hidden = true;
+  });
+
+  function render() {
+    if (bogoItems.length === 0) {
+      listContainer.innerHTML = "";
+      emptyState.hidden = false;
+      return;
+    }
+    emptyState.hidden = true;
+    listContainer.innerHTML = "";
+    [...bogoItems].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+      const row = document.createElement("div");
+      row.className = "shopping-item";
+      row.innerHTML = `
+        <span class="shopping-item-name">${escapeHtml(item.name)}</span>
+        ${item.note ? `<span class="bogo-item-note">${escapeHtml(item.note)}</span>` : ""}
+        <button type="button" class="icon-btn" title="Add to shopping list">+ Shopping List</button>
+        <button type="button" class="icon-btn danger" title="Remove">✖</button>
+      `;
+      const buttons = row.querySelectorAll("button");
+      buttons[0].addEventListener("click", () => {
+        const added = window.ShoppingListModule && window.ShoppingListModule.addToShoppingList(item.name);
+        const gt = window.GroceryTracker;
+        if (added && gt) gt.showToast(`Added ${item.name} to your shopping list.`);
+      });
+      buttons[1].addEventListener("click", () => {
+        if (!bogoCol) return;
+        bogoCol.doc(item.id).delete().catch(() => {});
+      });
+      listContainer.appendChild(row);
+    });
+  }
+
+  function addItem(name, note) {
+    if (!name || !bogoCol) return;
+    const newItem = { id: genId(), name, note: note || "", addedAt: new Date().toISOString() };
+    bogoCol.doc(newItem.id).set(newItem).catch(() => {});
+  }
+
+  bulkForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const lines = bulkInput.value.split("\n").map(l => l.trim()).filter(Boolean);
+    const existingNames = new Set(bogoItems.map(i => i.name.toLowerCase()));
+    lines.forEach(line => {
+      if (!existingNames.has(line.toLowerCase())) {
+        addItem(line, "");
+        existingNames.add(line.toLowerCase());
+      }
+    });
+    bulkForm.reset();
+  });
+
+  singleForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = nameInput.value.trim();
+    if (!name) return;
+    addItem(name, noteInput.value.trim());
+    singleForm.reset();
+    nameInput.focus();
+  });
+
+  clearBtn.addEventListener("click", () => {
+    if (!dbRef || bogoItems.length === 0) return;
+    if (!confirm("Clear your entire BOGO list?")) return;
+    const batch = dbRef.batch();
+    bogoItems.forEach(item => batch.delete(bogoCol.doc(item.id)));
+    batch.commit().catch(() => {});
+  });
+
+  mealPrepBtn.addEventListener("click", async () => {
+    if (bogoItems.length === 0) {
+      mealPrepStatus.textContent = "Add some BOGO items first.";
+      return;
+    }
+    if (!window.RecipeSearch) {
+      mealPrepStatus.textContent = "Recipe search isn't ready yet — try again in a moment.";
+      return;
+    }
+    mealPrepBtn.disabled = true;
+    mealPrepStatus.textContent = "Generating meal prep ideas…";
+    mealPrepResults.innerHTML = "";
+
+    try {
+      const names = bogoItems.map(i => i.name);
+      const { recipes, unmatched } = await window.RecipeSearch.searchRecipes(names, "", []);
+      window.RecipeSearch.renderRecipes(mealPrepResults, recipes, unmatched);
+      mealPrepStatus.textContent = recipes.length ? `Found ${recipes.length} idea${recipes.length === 1 ? "" : "s"}.` : "";
+    } catch (e) {
+      console.error("BOGO meal prep search failed", e);
+      mealPrepStatus.textContent = "Couldn't generate ideas — check your connection.";
+    } finally {
+      mealPrepBtn.disabled = false;
+    }
+  });
+
+  function init() {
+    checkBanner();
+    const activeDb = window.GroceryTracker ? window.GroceryTracker.getDb() : null;
+    if (!activeDb) {
+      emptyState.hidden = false;
+      emptyState.textContent = "Not connected — check your Firebase config.";
+      return;
+    }
+    dbRef = activeDb;
+    bogoCol = activeDb.collection("bogoItems");
+    bogoCol.onSnapshot(
+      snapshot => {
+        bogoItems = snapshot.docs.map(d => d.data());
+        render();
+      },
+      err => {
+        console.error("BOGO list sync error", err);
+        listContainer.innerHTML = "";
+        emptyState.hidden = false;
+        emptyState.textContent = err.code === "permission-denied"
+          ? "Can't sync — add a \"bogoItems\" rule in your Firestore rules."
           : "Sync error — check your connection.";
       }
     );
