@@ -512,6 +512,16 @@ button {
 }
 .shopping-form button:hover { background: var(--accent-dark); }
 
+.shopping-group { margin-bottom: 20px; }
+.shopping-group-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin: 0 0 8px 2px;
+}
+
 .shopping-list { display: flex; flex-direction: column; gap: 8px; }
 .shopping-item {
   display: flex;
@@ -526,6 +536,31 @@ button {
 .shopping-item input[type="checkbox"] { width: 20px; height: 20px; flex-shrink: 0; cursor: pointer; }
 .shopping-item-name { flex: 1; font-weight: 600; font-size: 0.95rem; }
 .shopping-item-qty { font-size: 0.8rem; color: var(--text-muted); background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+
+.shopping-item-location {
+  font-size: 0.78rem;
+  color: var(--accent);
+  background: var(--fresh-bg);
+  border: 1px solid var(--fresh-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.shopping-item-location.unset {
+  color: var(--text-muted);
+  background: var(--bg);
+  border-style: dashed;
+}
+.shopping-item-location-input {
+  width: 110px;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.78rem;
+}
 
 @media (max-width: 700px) {
   .add-form { grid-template-columns: 1fr 1fr; }
@@ -857,6 +892,77 @@ const FIREBASE_CONFIG = {
   }
 
   global.ShelfLifeDB = { lookup, daysFor, STORAGE_OPTIONS };
+})(window);
+</script>
+
+<script>
+/*
+ * Typical grocery-store department for common items — a general default
+ * guess, not specific to any one store. The shopping list lets you
+ * override this per item (e.g. a real aisle number) and remembers what
+ * you set, so it gets more accurate to your actual store over time.
+ */
+(function (global) {
+  "use strict";
+
+  const SECTION_ORDER = [
+    "Produce", "Bakery", "Deli", "Meat & Seafood", "Dairy", "Frozen",
+    "Pantry", "Beverages", "Household", "Health & Beauty"
+  ];
+
+  const ENTRIES = [
+    { keywords: ["apple", "banana", "orange", "mandarin", "clementine", "tangerine", "lemon", "lime", "grape", "strawberry", "blueberry", "raspberry", "blackberry", "pineapple", "watermelon", "cantaloupe", "melon", "honeydew", "mango", "avocado", "peach", "nectarine", "pear", "plum", "kiwi", "cherry", "broccoli", "cauliflower", "carrot", "celery", "cucumber", "zucchini", "squash", "bell pepper", "pepper", "tomato", "sweet potato", "yam", "potato", "onion", "garlic", "ginger", "lettuce", "spinach", "kale", "cabbage", "mushroom", "green bean", "corn", "asparagus", "eggplant", "radish", "beet", "brussels sprout", "artichoke", "basil", "cilantro", "parsley", "herb", "dill", "mint", "pea"], section: "Produce" },
+    { keywords: ["milk", "egg", "butter", "cream cheese", "cottage cheese", "sour cream", "heavy cream", "half and half", "creamer", "mozzarella", "cheddar", "cheese", "yogurt"], section: "Dairy" },
+    { keywords: ["chicken", "ground beef", "ground turkey", "ground pork", "steak", "beef", "pork", "bacon", "sausage", "salmon", "shrimp", "fish", "turkey", "deli meat", "lunch meat", "ham", "hot dog", "tofu"], section: "Meat & Seafood" },
+    { keywords: ["bread", "bagel", "tortilla"], section: "Bakery" },
+    { keywords: ["ice cream", "popsicle", "frozen pizza", "frozen waffle", "frozen vegetable", "frozen fruit", "frozen meal", "frozen dinner"], section: "Frozen" },
+    { keywords: ["rice", "pasta", "flour", "sugar", "cereal", "canned bean", "canned soup", "canned vegetable", "canned good", "peanut butter", "honey", "oat", "cracker", "chip"], section: "Pantry" },
+    { keywords: ["juice", "soda", "pop", "coffee", "tea", "water"], section: "Beverages" },
+    { keywords: ["paper towel", "toilet paper", "napkin", "foil", "plastic wrap", "trash bag", "dish soap", "laundry detergent", "detergent", "sponge"], section: "Household" },
+    { keywords: ["shampoo", "conditioner", "soap", "toothpaste", "toothbrush", "deodorant", "razor", "lotion"], section: "Health & Beauty" }
+  ];
+
+  const KEYWORD_MAP = new Map();
+  ENTRIES.forEach(entry => {
+    entry.keywords.forEach(kw => KEYWORD_MAP.set(kw, entry.section));
+  });
+
+  function singularize(word) {
+    if (word.length <= 3) return word;
+    if (word.endsWith("ies")) return word.slice(0, -3) + "y";
+    if (word.endsWith("oes")) return word.slice(0, -2);
+    if (word.endsWith("ches") || word.endsWith("shes") || word.endsWith("xes") || word.endsWith("ses")) {
+      return word.slice(0, -2);
+    }
+    if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+    return word;
+  }
+
+  function normalizeWords(str) {
+    return str
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(singularize);
+  }
+
+  function lookup(name) {
+    if (!name) return null;
+    const words = normalizeWords(name);
+    if (words.length === 0) return null;
+
+    const maxWindow = Math.min(3, words.length);
+    for (let windowSize = maxWindow; windowSize >= 1; windowSize--) {
+      for (let start = 0; start + windowSize <= words.length; start++) {
+        const candidate = words.slice(start, start + windowSize).join(" ");
+        if (KEYWORD_MAP.has(candidate)) return KEYWORD_MAP.get(candidate);
+      }
+    }
+    return null;
+  }
+
+  global.StoreSections = { lookup, SECTION_ORDER };
 })(window);
 </script>
 
@@ -1812,6 +1918,9 @@ if ("serviceWorker" in navigator) {
   let shoppingCol = null;
   let dbRef = null;
 
+  const LOCATION_MEMORY_KEY = "grocery-tracker-item-locations-v1";
+  const SECTION_ORDER = window.StoreSections ? window.StoreSections.SECTION_ORDER : [];
+
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, ch => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -1822,6 +1931,54 @@ if ("serviceWorker" in navigator) {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
 
+  function normalizeName(name) {
+    return name.trim().toLowerCase();
+  }
+
+  function loadLocationMemory() {
+    try {
+      return JSON.parse(localStorage.getItem(LOCATION_MEMORY_KEY) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function rememberLocation(name, location) {
+    const mem = loadLocationMemory();
+    if (location) {
+      mem[normalizeName(name)] = location;
+    } else {
+      delete mem[normalizeName(name)];
+    }
+    try {
+      localStorage.setItem(LOCATION_MEMORY_KEY, JSON.stringify(mem));
+    } catch (e) { /* storage unavailable — fine, just won't persist the guess */ }
+  }
+
+  function guessLocation(name) {
+    const mem = loadLocationMemory();
+    if (mem[normalizeName(name)]) return mem[normalizeName(name)];
+    return (window.StoreSections && window.StoreSections.lookup(name)) || "";
+  }
+
+  // Named departments sort in SECTION_ORDER; anything else with a number
+  // (e.g. "Aisle 9") sorts numerically after; anything else sorts
+  // alphabetically after that; blank/unset always sorts last.
+  function sectionSortKey(location) {
+    if (!location) return [3, 0, ""];
+    const idx = SECTION_ORDER.findIndex(s => s.toLowerCase() === location.trim().toLowerCase());
+    if (idx !== -1) return [0, idx, ""];
+    const numMatch = location.match(/\d+/);
+    if (numMatch) return [1, parseInt(numMatch[0], 10), location.toLowerCase()];
+    return [2, 0, location.toLowerCase()];
+  }
+
+  function updateItemLocation(item, location) {
+    if (!shoppingCol) return;
+    shoppingCol.doc(item.id).set({ location }, { merge: true }).catch(() => {});
+    rememberLocation(item.name, location);
+  }
+
   function render() {
     if (shoppingItems.length === 0) {
       listContainer.innerHTML = "";
@@ -1830,19 +1987,78 @@ if ("serviceWorker" in navigator) {
     }
     emptyState.hidden = true;
     listContainer.innerHTML = "";
-    [...shoppingItems].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
-      const row = document.createElement("div");
-      row.className = "shopping-item";
-      row.innerHTML = `
-        <input type="checkbox" title="Picked it up">
-        <span class="shopping-item-name">${escapeHtml(item.name)}</span>
-        ${item.qty ? `<span class="shopping-item-qty">${escapeHtml(item.qty)}</span>` : ""}
-        <button type="button" class="icon-btn danger" title="Remove from list">✖</button>
-      `;
-      row.querySelector("input[type=checkbox]").addEventListener("change", () => pickUp(item));
-      row.querySelector(".icon-btn").addEventListener("click", () => removeFromList(item));
-      listContainer.appendChild(row);
+
+    const groups = new Map();
+    shoppingItems.forEach(item => {
+      const loc = item.location || "";
+      if (!groups.has(loc)) groups.set(loc, []);
+      groups.get(loc).push(item);
     });
+
+    const sortedGroupKeys = Array.from(groups.keys()).sort((a, b) => {
+      const ka = sectionSortKey(a), kb = sectionSortKey(b);
+      if (ka[0] !== kb[0]) return ka[0] - kb[0];
+      if (ka[1] !== kb[1]) return ka[1] - kb[1];
+      return ka[2].localeCompare(kb[2]);
+    });
+
+    sortedGroupKeys.forEach(loc => {
+      const groupEl = document.createElement("div");
+      groupEl.className = "shopping-group";
+
+      const titleEl = document.createElement("h2");
+      titleEl.className = "shopping-group-title";
+      titleEl.textContent = loc || "Unsorted";
+      groupEl.appendChild(titleEl);
+
+      const listEl = document.createElement("div");
+      listEl.className = "shopping-list";
+
+      groups.get(loc).sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+        listEl.appendChild(renderRow(item));
+      });
+
+      groupEl.appendChild(listEl);
+      listContainer.appendChild(groupEl);
+    });
+  }
+
+  function renderRow(item) {
+    const row = document.createElement("div");
+    row.className = "shopping-item";
+    row.innerHTML = `
+      <input type="checkbox" title="Picked it up">
+      <span class="shopping-item-name">${escapeHtml(item.name)}</span>
+      ${item.qty ? `<span class="shopping-item-qty">${escapeHtml(item.qty)}</span>` : ""}
+      <span class="shopping-item-location ${item.location ? "" : "unset"}" title="Click to set section/aisle">${escapeHtml(item.location || "Set aisle")}</span>
+      <button type="button" class="icon-btn danger" title="Remove from list">✖</button>
+    `;
+    row.querySelector("input[type=checkbox]").addEventListener("change", () => pickUp(item));
+    row.querySelector(".icon-btn").addEventListener("click", () => removeFromList(item));
+
+    const locationBadge = row.querySelector(".shopping-item-location");
+    locationBadge.addEventListener("click", () => {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "shopping-item-location-input";
+      input.value = item.location || "";
+      input.placeholder = "e.g. Aisle 9";
+      locationBadge.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const commit = () => {
+        const value = input.value.trim();
+        updateItemLocation(item, value);
+      };
+      input.addEventListener("blur", commit);
+      input.addEventListener("keydown", e => {
+        if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+        if (e.key === "Escape") { input.value = item.location || ""; input.blur(); }
+      });
+    });
+
+    return row;
   }
 
   function pickUp(item) {
@@ -1887,7 +2103,13 @@ if ("serviceWorker" in navigator) {
     e.preventDefault();
     const name = shoppingNameInput.value.trim();
     if (!name || !shoppingCol) return;
-    const newItem = { id: genId(), name, qty: shoppingQtyInput.value.trim(), addedAt: new Date().toISOString() };
+    const newItem = {
+      id: genId(),
+      name,
+      qty: shoppingQtyInput.value.trim(),
+      location: guessLocation(name),
+      addedAt: new Date().toISOString()
+    };
     shoppingCol.doc(newItem.id).set(newItem).catch(() => {});
     shoppingForm.reset();
     shoppingNameInput.focus();
