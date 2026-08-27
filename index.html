@@ -366,6 +366,7 @@ button {
   gap: 10px;
   max-width: 90vw;
 }
+.toast[hidden] { display: none; }
 
 .toast-action {
   background: transparent;
@@ -736,6 +737,9 @@ button {
     <input type="text" id="searchBox" placeholder="Search items...">
     <select id="categoryFilter">
       <option value="">All categories</option>
+    </select>
+    <select id="storageFilter">
+      <option value="">All locations</option>
     </select>
     <button id="clearFilters" class="ghost-btn" type="button">Clear filters</button>
   </section>
@@ -1212,6 +1216,51 @@ const FIREBASE_CONFIG = {
 </script>
 
 <script>
+/*
+ * Best-effort category guess for the Groceries add form, matched against
+ * the app's fixed category dropdown (Produce, Dairy, Meat & Seafood,
+ * Bakery, Frozen, Pantry, Beverages, Leftovers). Falls back to null
+ * ("Other") when nothing matches.
+ */
+(function (global) {
+  "use strict";
+
+  function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  const ENTRIES = [
+    { keywords: ["apple", "banana", "orange", "mandarin", "clementine", "tangerine", "lemon", "lime", "grape", "strawberry", "blueberry", "raspberry", "blackberry", "pineapple", "watermelon", "cantaloupe", "melon", "honeydew", "mango", "avocado", "peach", "nectarine", "pear", "plum", "kiwi", "cherry", "broccoli", "cauliflower", "carrot", "celery", "cucumber", "zucchini", "squash", "bell pepper", "pepper", "tomato", "sweet potato", "yam", "potato", "onion", "garlic", "ginger", "lettuce", "spinach", "kale", "cabbage", "mushroom", "green bean", "corn", "asparagus", "eggplant", "radish", "beet", "brussels sprout", "artichoke", "basil", "cilantro", "parsley", "herb", "dill", "mint", "pea"], category: "Produce" },
+    { keywords: ["milk", "egg", "butter", "cream cheese", "cottage cheese", "sour cream", "heavy cream", "half and half", "creamer", "mozzarella", "cheddar", "cheese", "yogurt"], category: "Dairy" },
+    { keywords: ["chicken", "ground beef", "ground turkey", "ground pork", "steak", "beef", "pork", "bacon", "sausage", "salmon", "shrimp", "fish", "turkey", "deli meat", "lunch meat", "ham", "hot dog", "tofu"], category: "Meat & Seafood" },
+    { keywords: ["bread", "bagel", "tortilla"], category: "Bakery" },
+    { keywords: ["ice cream", "popsicle", "frozen pizza", "frozen waffle", "frozen vegetable", "frozen fruit", "frozen meal", "frozen dinner", "hash brown", "tater tot"], category: "Frozen" },
+    { keywords: ["rice", "pasta", "flour", "sugar", "cereal", "canned bean", "canned soup", "canned vegetable", "canned good", "peanut butter", "honey", "oat", "cracker", "chip", "coffee", "tea"], category: "Pantry" },
+    { keywords: ["juice", "soda", "pop", "water", "gatorade"], category: "Beverages" },
+    { keywords: ["leftover", "cooked rice", "soup"], category: "Leftovers" }
+  ];
+
+  const KEYWORD_MAP = new Map();
+  ENTRIES.forEach(entry => {
+    entry.keywords.forEach(kw => KEYWORD_MAP.set(kw, entry.category));
+  });
+  const COMPILED = Array.from(KEYWORD_MAP.keys())
+    .sort((a, b) => b.length - a.length)
+    .map(kw => ({ kw, re: new RegExp("\\b" + escapeRegExp(kw) + "s?\\b", "i") }));
+
+  function lookup(name) {
+    if (!name) return null;
+    for (const { kw, re } of COMPILED) {
+      if (re.test(name)) return KEYWORD_MAP.get(kw);
+    }
+    return null;
+  }
+
+  global.GroceryCategories = { lookup };
+})(window);
+</script>
+
+<script>
 (function () {
   "use strict";
 
@@ -1222,6 +1271,7 @@ const FIREBASE_CONFIG = {
   let state = {
     search: "",
     category: "",
+    storage: "",
     urgency: "" // '', 'expired', 'today', 'soon', 'fresh'
   };
 
@@ -1420,6 +1470,7 @@ const FIREBASE_CONFIG = {
 
   const searchBox = document.getElementById("searchBox");
   const categoryFilter = document.getElementById("categoryFilter");
+  const storageFilter = document.getElementById("storageFilter");
   const clearFiltersBtn = document.getElementById("clearFilters");
 
   const groupsContainer = document.getElementById("groupsContainer");
@@ -1466,6 +1517,7 @@ const FIREBASE_CONFIG = {
     return items.filter(i => {
       if (state.urgency && urgencyOf(i.expiry) !== state.urgency) return false;
       if (state.category && i.category !== state.category) return false;
+      if (state.storage && i.storage !== state.storage) return false;
       if (search && !i.name.toLowerCase().includes(search)) return false;
       return true;
     });
@@ -1565,9 +1617,12 @@ const FIREBASE_CONFIG = {
 
     card.querySelector(".edit-suggest-btn").addEventListener("click", () => {
       const nameVal = card.querySelector(".edit-name").value;
+      const categoryGuess = window.GroceryCategories ? window.GroceryCategories.lookup(nameVal) : null;
+      if (categoryGuess) categorySelect.value = categoryGuess;
+
       const match = ShelfLifeDB.lookup(nameVal);
       if (!match) {
-        showToast(`No shelf-life estimate for "${nameVal}".`);
+        showToast(categoryGuess ? `Category updated — no shelf-life estimate for "${nameVal}".` : `No shelf-life estimate for "${nameVal}".`);
         return;
       }
       storageSelect.value = match.defaultStorage;
@@ -1652,6 +1707,15 @@ const FIREBASE_CONFIG = {
 
   let dateTouchedByUser = false;
   let storageTouchedByUser = false;
+  let categoryTouchedByUser = false;
+
+  function updateCategoryGuess() {
+    if (categoryTouchedByUser) return;
+    const name = itemNameInput.value.trim();
+    if (!name) return;
+    const guess = window.GroceryCategories ? window.GroceryCategories.lookup(name) : null;
+    if (guess) itemCategoryInput.value = guess;
+  }
 
   function updateShelfLifeHint() {
     const name = itemNameInput.value.trim();
@@ -1701,8 +1765,10 @@ const FIREBASE_CONFIG = {
     if (!itemNameInput.value.trim()) {
       dateTouchedByUser = false;
       storageTouchedByUser = false;
+      categoryTouchedByUser = false;
     }
     updateShelfLifeHint();
+    updateCategoryGuess();
   }, 250));
 
   itemExpiryInput.addEventListener("input", () => {
@@ -1713,6 +1779,10 @@ const FIREBASE_CONFIG = {
   itemStorageInput.addEventListener("change", () => {
     storageTouchedByUser = true;
     updateShelfLifeHint();
+  });
+
+  itemCategoryInput.addEventListener("change", () => {
+    categoryTouchedByUser = true;
   });
 
   expiryHintEl.addEventListener("click", e => {
@@ -1749,6 +1819,7 @@ const FIREBASE_CONFIG = {
     itemStorageInput.value = DEFAULT_STORAGE;
     dateTouchedByUser = false;
     storageTouchedByUser = false;
+    categoryTouchedByUser = false;
     expiryHintEl.textContent = "";
     expiryHintEl.classList.remove("has-match");
     itemNameInput.focus();
@@ -1764,6 +1835,11 @@ const FIREBASE_CONFIG = {
     renderList();
   });
 
+  storageFilter.addEventListener("change", () => {
+    state.storage = storageFilter.value;
+    renderList();
+  });
+
   summaryBar.addEventListener("click", e => {
     const pill = e.target.closest(".summary-pill");
     if (!pill) return;
@@ -1776,20 +1852,26 @@ const FIREBASE_CONFIG = {
   clearFiltersBtn.addEventListener("click", () => {
     state.search = "";
     state.category = "";
+    state.storage = "";
     state.urgency = "";
     searchBox.value = "";
     categoryFilter.value = "";
+    storageFilter.value = "";
     renderSummary();
     renderList();
   });
 
-  // populate the storage dropdown and give the date field a sensible default
+  // populate the storage dropdowns and give the date field a sensible default
   (function initAddForm() {
     itemStorageInput.innerHTML = ShelfLifeDB.STORAGE_OPTIONS.map(o =>
       `<option value="${o.value}">${o.icon} ${o.label}</option>`
     ).join("");
     itemStorageInput.value = DEFAULT_STORAGE;
     itemExpiryInput.value = addDays(7);
+
+    storageFilter.innerHTML = '<option value="">All locations</option>' + ShelfLifeDB.STORAGE_OPTIONS.map(o =>
+      `<option value="${o.value}">${o.icon} ${o.label}</option>`
+    ).join("");
   })();
 
   window.GroceryTracker = {
