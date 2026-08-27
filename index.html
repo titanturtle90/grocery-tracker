@@ -117,15 +117,11 @@ body {
 }
 
 .brand-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 44px;
   height: 44px;
   flex-shrink: 0;
-  font-size: 1.5rem;
   border-radius: 13px;
-  background: linear-gradient(155deg, var(--accent), var(--accent-dark));
+  object-fit: cover;
   box-shadow: 0 4px 14px -4px rgba(var(--accent-rgb), 0.55);
 }
 
@@ -759,7 +755,7 @@ button {
 
   <header class="app-header">
     <div class="brand">
-      <span class="brand-mark">🥕</span>
+      <img class="brand-mark" src="icon-192.png" alt="Nexpire">
       <div>
         <h1>Nexpire</h1>
         <p class="subtitle">Track what you have. Eat it before it's gone.</p>
