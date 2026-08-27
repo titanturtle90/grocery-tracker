@@ -117,6 +117,14 @@ body {
 .sync-status.synced { color: var(--fresh-fg); border-color: var(--fresh-border); }
 .sync-status.error { color: var(--expired-fg); border-color: var(--expired-border); }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#notifyBtn.enabled { color: var(--accent); border-color: var(--accent); }
+
 .summary-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -477,6 +485,48 @@ button {
 .recipe-detail h4 { margin: 0 0 4px; font-size: 0.82rem; color: var(--text); }
 .recipe-detail ul { margin: 0 0 10px; padding-left: 18px; }
 
+.recipe-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.recipe-filters input[type="text"] { flex: 1; min-width: 160px; }
+.recipe-filters select { max-width: 180px; }
+
+.shopping-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.shopping-form input[type="text"]:first-child { flex: 2; min-width: 160px; }
+.shopping-form input[type="text"]:nth-child(2) { flex: 1; min-width: 110px; }
+.shopping-form button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 600;
+}
+.shopping-form button:hover { background: var(--accent-dark); }
+
+.shopping-list { display: flex; flex-direction: column; gap: 8px; }
+.shopping-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+}
+.shopping-item input[type="checkbox"] { width: 20px; height: 20px; flex-shrink: 0; cursor: pointer; }
+.shopping-item-name { flex: 1; font-weight: 600; font-size: 0.95rem; }
+.shopping-item-qty { font-size: 0.8rem; color: var(--text-muted); background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+
 @media (max-width: 700px) {
   .add-form { grid-template-columns: 1fr 1fr; }
   .field-storage { grid-column: span 1; }
@@ -496,11 +546,15 @@ button {
       <h1>🥕 Grocery Tracker</h1>
       <p class="subtitle">Track what you have. Eat it before it's gone.</p>
     </div>
-    <span id="syncStatus" class="sync-status">🔄 Connecting…</span>
+    <div class="header-actions">
+      <button id="notifyBtn" class="ghost-btn" type="button" hidden>🔔 Enable alerts</button>
+      <span id="syncStatus" class="sync-status">🔄 Connecting…</span>
+    </div>
   </header>
 
   <nav class="tab-bar" id="tabBar">
     <button class="tab-btn active" data-tab="groceries" type="button">🛒 Groceries</button>
+    <button class="tab-btn" data-tab="shopping" type="button">🛍️ Shopping List</button>
     <button class="tab-btn" data-tab="recipes" type="button">🍳 Recipes</button>
   </nav>
 
@@ -575,12 +629,33 @@ button {
 
   </div>
 
+  <div id="shoppingPanel" hidden>
+    <p class="subtitle">What you need to pick up next time you're at the store.</p>
+    <form id="shoppingForm" class="shopping-form">
+      <input type="text" id="shoppingName" placeholder="e.g. Paper towels" required>
+      <input type="text" id="shoppingQty" placeholder="Qty (optional)">
+      <button type="submit">Add</button>
+    </form>
+    <div class="list-section">
+      <p id="shoppingEmptyState" class="empty-state" hidden>Your shopping list is empty. Add something above.</p>
+      <div id="shoppingListContainer" class="shopping-list"></div>
+    </div>
+    <button id="clearShoppingBtn" class="ghost-btn" type="button" style="margin-top:14px;">Clear entire list</button>
+  </div>
+
   <div id="recipesPanel" hidden>
     <p class="subtitle">Pick what you want to use up, and I'll find recipes built around it.</p>
     <div id="recipeChecklist" class="recipe-checklist"></div>
     <div class="recipe-actions">
       <button id="findRecipesBtn" type="button">Find Recipes</button>
       <span id="recipeStatus" class="recipe-status"></span>
+    </div>
+    <div class="recipe-filters">
+      <input type="text" id="recipeNameFilter" placeholder="Filter results by name...">
+      <select id="recipeCuisineFilter">
+        <option value="">Any cuisine</option>
+      </select>
+      <input type="text" id="recipeExcludeFilter" placeholder="Exclude ingredients (comma-separated)">
     </div>
     <div id="recipeResults"></div>
     <p class="recipe-status" style="margin-top:24px;">Recipes courtesy of <a href="https://www.themealdb.com" target="_blank" rel="noopener">TheMealDB</a>.</p>
@@ -803,6 +878,7 @@ const FIREBASE_CONFIG = {
 
   const syncStatusEl = document.getElementById("syncStatus");
   let itemsCol = null;
+  let firestoreDb = null;
 
   function setSyncStatus(status, text) {
     syncStatusEl.className = "sync-status " + status;
@@ -817,6 +893,7 @@ const FIREBASE_CONFIG = {
     try {
       firebase.initializeApp(FIREBASE_CONFIG);
       const db = firebase.firestore();
+      firestoreDb = db;
       try {
         db.enablePersistence({ synchronizeTabs: true }).catch(() => { /* unsupported browser/mode — fine, just no offline cache */ });
       } catch (e) { /* ignore */ }
@@ -827,6 +904,7 @@ const FIREBASE_CONFIG = {
           items = snapshot.docs.map(d => d.data());
           setSyncStatus("synced", "✅ Synced");
           render();
+          checkExpiryNotifications();
         },
         err => {
           console.error("Firestore sync error", err);
@@ -837,6 +915,67 @@ const FIREBASE_CONFIG = {
       console.error("Failed to init Firebase", e);
       setSyncStatus("error", "⚠️ Couldn't connect");
     }
+  }
+
+  // ---------- expiry notifications (on-open only — no server, so this only
+  // fires while the app is actually open, not in the background) ----------
+
+  const notifyBtn = document.getElementById("notifyBtn");
+  const NOTIFY_LAST_KEY = "grocery-tracker-last-notify-date";
+  const notificationsSupported = "Notification" in window && "serviceWorker" in navigator;
+
+  function updateNotifyBtn() {
+    if (!notificationsSupported) return;
+    if (Notification.permission === "granted") {
+      notifyBtn.hidden = true;
+    } else if (Notification.permission === "denied") {
+      notifyBtn.hidden = true;
+    } else {
+      notifyBtn.hidden = false;
+      notifyBtn.textContent = "🔔 Enable alerts";
+    }
+  }
+
+  if (notificationsSupported) {
+    updateNotifyBtn();
+    notifyBtn.addEventListener("click", async () => {
+      const perm = await Notification.requestPermission();
+      updateNotifyBtn();
+      if (perm === "granted") {
+        showToast("Alerts enabled — I'll notify you when something's expiring, each time you open the app.");
+        checkExpiryNotifications(true);
+      } else {
+        showToast("Alerts not enabled.");
+      }
+    });
+  }
+
+  function checkExpiryNotifications(force) {
+    if (!notificationsSupported || Notification.permission !== "granted") return;
+
+    const today = toDateStr(startOfToday());
+    if (!force && localStorage.getItem(NOTIFY_LAST_KEY) === today) return;
+
+    const urgent = items.filter(i => {
+      const u = urgencyOf(i.expiry);
+      return u === "expired" || u === "today";
+    });
+    if (urgent.length === 0) return;
+
+    localStorage.setItem(NOTIFY_LAST_KEY, today);
+
+    const names = urgent.slice(0, 3).map(i => i.name).join(", ");
+    const extra = urgent.length > 3 ? ` +${urgent.length - 3} more` : "";
+    const body = `${names}${extra} — expired or due today.`;
+
+    navigator.serviceWorker.ready.then(reg => {
+      reg.showNotification("Grocery Tracker", {
+        body,
+        icon: "icon-192.png",
+        badge: "icon-192.png",
+        tag: "grocery-expiry"
+      });
+    }).catch(() => { /* no active service worker yet — skip silently */ });
   }
 
   function upsertItem(item) {
@@ -1302,7 +1441,15 @@ const FIREBASE_CONFIG = {
     itemExpiryInput.value = addDays(7);
   })();
 
-  window.GroceryTracker = { getItems: () => items, urgencyOf };
+  window.GroceryTracker = {
+    getItems: () => items,
+    urgencyOf,
+    getDb: () => firestoreDb,
+    upsertItem,
+    genId,
+    addDays,
+    showToast
+  };
 
   render();
   initFirebase();
@@ -1324,19 +1471,26 @@ if ("serviceWorker" in navigator) {
 
   const tabBar = document.getElementById("tabBar");
   const groceriesPanel = document.getElementById("groceriesPanel");
+  const shoppingPanel = document.getElementById("shoppingPanel");
   const recipesPanel = document.getElementById("recipesPanel");
   const checklistEl = document.getElementById("recipeChecklist");
   const findBtn = document.getElementById("findRecipesBtn");
   const statusEl = document.getElementById("recipeStatus");
   const resultsEl = document.getElementById("recipeResults");
 
+  const nameFilterInput = document.getElementById("recipeNameFilter");
+  const cuisineFilterSelect = document.getElementById("recipeCuisineFilter");
+  const excludeFilterInput = document.getElementById("recipeExcludeFilter");
+
   const MEALDB_BASE = "https://www.themealdb.com/api/json/v1/1/";
   const INGREDIENT_CACHE_KEY = "grocery-tracker-mealdb-ingredients-v1";
-  const INGREDIENT_CACHE_DAYS = 30;
+  const AREA_CACHE_KEY = "grocery-tracker-mealdb-areas-v1";
+  const LIST_CACHE_DAYS = 30;
 
   let canonicalIngredients = null;
   const recipeDetailCache = new Map();
   let checklistPopulated = false;
+  let cuisineListLoaded = false;
 
   // ---------- tab switching ----------
 
@@ -1346,11 +1500,14 @@ if ("serviceWorker" in navigator) {
     const tab = btn.dataset.tab;
     tabBar.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
     groceriesPanel.hidden = tab !== "groceries";
+    shoppingPanel.hidden = tab !== "shopping";
     recipesPanel.hidden = tab !== "recipes";
     if (tab === "recipes" && !checklistPopulated) {
       populateChecklist();
+      loadCuisineOptions();
       checklistPopulated = true;
     }
+    document.dispatchEvent(new CustomEvent("tabchange", { detail: { tab } }));
   });
 
   // ---------- helpers ----------
@@ -1371,7 +1528,7 @@ if ("serviceWorker" in navigator) {
     if (canonicalIngredients) return canonicalIngredients;
     try {
       const cached = JSON.parse(localStorage.getItem(INGREDIENT_CACHE_KEY) || "null");
-      if (cached && Date.now() - cached.fetchedAt < INGREDIENT_CACHE_DAYS * 86400000) {
+      if (cached && Date.now() - cached.fetchedAt < LIST_CACHE_DAYS * 86400000) {
         canonicalIngredients = cached.names;
         return canonicalIngredients;
       }
@@ -1385,6 +1542,29 @@ if ("serviceWorker" in navigator) {
       localStorage.setItem(INGREDIENT_CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), names }));
     } catch (e) { /* storage unavailable — just won't cache */ }
     return names;
+  }
+
+  async function loadCuisineOptions() {
+    if (cuisineListLoaded) return;
+    cuisineListLoaded = true;
+    try {
+      let areas = null;
+      const cached = JSON.parse(localStorage.getItem(AREA_CACHE_KEY) || "null");
+      if (cached && Date.now() - cached.fetchedAt < LIST_CACHE_DAYS * 86400000) {
+        areas = cached.names;
+      } else {
+        const res = await fetch(MEALDB_BASE + "list.php?a=list");
+        const data = await res.json();
+        areas = (data.meals || []).map(m => m.strArea).filter(Boolean).sort();
+        try {
+          localStorage.setItem(AREA_CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), names: areas }));
+        } catch (e) { /* storage unavailable — just won't cache */ }
+      }
+      cuisineFilterSelect.innerHTML = '<option value="">Any cuisine</option>' +
+        areas.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("");
+    } catch (e) {
+      console.error("Failed to load cuisine list", e);
+    }
   }
 
   function findCanonicalIngredient(itemName, canonicalList) {
@@ -1426,7 +1606,7 @@ if ("serviceWorker" in navigator) {
 
   // ---------- search ----------
 
-  async function searchRecipes(selectedNames) {
+  async function searchRecipes(selectedNames, cuisine, excludeTerms) {
     const canonicalList = await getCanonicalIngredients();
     const mapped = selectedNames
       .map(name => ({ name, canonical: findCanonicalIngredient(name, canonicalList) }))
@@ -1459,9 +1639,31 @@ if ("serviceWorker" in navigator) {
       });
     });
 
-    const recipes = Array.from(mealMap.values())
-      .sort((a, b) => b.matchedItems.length - a.matchedItems.length)
-      .slice(0, 24);
+    let recipes = Array.from(mealMap.values())
+      .sort((a, b) => b.matchedItems.length - a.matchedItems.length);
+
+    if (cuisine) {
+      try {
+        const res = await fetch(MEALDB_BASE + "filter.php?a=" + encodeURIComponent(cuisine));
+        const data = await res.json();
+        const idsInCuisine = new Set((data.meals || []).map(m => m.idMeal));
+        recipes = recipes.filter(r => idsInCuisine.has(r.idMeal));
+      } catch (e) {
+        console.error("Cuisine filter failed", e);
+      }
+    }
+
+    recipes = recipes.slice(0, 24);
+
+    if (excludeTerms && excludeTerms.length > 0) {
+      const details = await Promise.all(recipes.map(r => getRecipeDetail(r.idMeal)));
+      recipes = recipes.filter((r, idx) => {
+        const meal = details[idx];
+        if (!meal) return true;
+        const ingredientText = extractIngredients(meal).join(" ").toLowerCase();
+        return !excludeTerms.some(term => ingredientText.includes(term));
+      });
+    }
 
     return { recipes, unmatched };
   }
@@ -1562,12 +1764,19 @@ if ("serviceWorker" in navigator) {
       statusEl.textContent = "Select at least one item first.";
       return;
     }
+    const cuisine = cuisineFilterSelect.value;
+    const excludeTerms = excludeFilterInput.value
+      .split(",")
+      .map(t => t.trim().toLowerCase())
+      .filter(Boolean);
+
     findBtn.disabled = true;
-    statusEl.textContent = "Searching recipes…";
+    statusEl.textContent = excludeTerms.length ? "Searching recipes (checking exclusions)…" : "Searching recipes…";
     resultsEl.innerHTML = "";
+    nameFilterInput.value = "";
 
     try {
-      const { recipes, unmatched } = await searchRecipes(selected);
+      const { recipes, unmatched } = await searchRecipes(selected, cuisine, excludeTerms);
       renderRecipes(recipes, unmatched);
       statusEl.textContent = recipes.length ? `Found ${recipes.length} recipe${recipes.length === 1 ? "" : "s"}.` : "";
     } catch (e) {
@@ -1577,6 +1786,147 @@ if ("serviceWorker" in navigator) {
       findBtn.disabled = false;
     }
   });
+
+  nameFilterInput.addEventListener("input", () => {
+    const term = nameFilterInput.value.trim().toLowerCase();
+    resultsEl.querySelectorAll(".recipe-card").forEach(card => {
+      const title = card.querySelector(".recipe-card-title").textContent.toLowerCase();
+      card.style.display = !term || title.includes(term) ? "" : "none";
+    });
+  });
+})();
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  const shoppingForm = document.getElementById("shoppingForm");
+  const shoppingNameInput = document.getElementById("shoppingName");
+  const shoppingQtyInput = document.getElementById("shoppingQty");
+  const listContainer = document.getElementById("shoppingListContainer");
+  const emptyState = document.getElementById("shoppingEmptyState");
+  const clearBtn = document.getElementById("clearShoppingBtn");
+
+  let shoppingItems = [];
+  let shoppingCol = null;
+  let dbRef = null;
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[ch]));
+  }
+
+  function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function render() {
+    if (shoppingItems.length === 0) {
+      listContainer.innerHTML = "";
+      emptyState.hidden = false;
+      return;
+    }
+    emptyState.hidden = true;
+    listContainer.innerHTML = "";
+    [...shoppingItems].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+      const row = document.createElement("div");
+      row.className = "shopping-item";
+      row.innerHTML = `
+        <input type="checkbox" title="Picked it up">
+        <span class="shopping-item-name">${escapeHtml(item.name)}</span>
+        ${item.qty ? `<span class="shopping-item-qty">${escapeHtml(item.qty)}</span>` : ""}
+        <button type="button" class="icon-btn danger" title="Remove from list">✖</button>
+      `;
+      row.querySelector("input[type=checkbox]").addEventListener("change", () => pickUp(item));
+      row.querySelector(".icon-btn").addEventListener("click", () => removeFromList(item));
+      listContainer.appendChild(row);
+    });
+  }
+
+  function pickUp(item) {
+    if (!shoppingCol) return;
+    shoppingCol.doc(item.id).delete().catch(() => {});
+
+    const gt = window.GroceryTracker;
+    if (!gt) return;
+
+    const match = window.ShelfLifeDB ? window.ShelfLifeDB.lookup(item.name) : null;
+    const storage = match ? match.defaultStorage : "fridge";
+    const days = match ? window.ShelfLifeDB.daysFor(match, storage) : 7;
+    const newGroceryId = gt.genId();
+    const groceryItem = {
+      id: newGroceryId,
+      name: item.name,
+      qty: item.qty || "",
+      category: "Other",
+      storage,
+      expiry: gt.addDays(days),
+      addedAt: new Date().toISOString()
+    };
+    gt.upsertItem(groceryItem).catch(() => {});
+
+    const estimateNote = match ? ` (est. ${days}-day shelf life)` : "";
+    gt.showToast(`Added ${item.name} to groceries${estimateNote}.`, {
+      label: "Undo",
+      onClick: () => {
+        shoppingCol.doc(item.id).set(item).catch(() => {});
+        const db = gt.getDb();
+        if (db) db.collection("groceryItems").doc(newGroceryId).delete().catch(() => {});
+      }
+    });
+  }
+
+  function removeFromList(item) {
+    if (!shoppingCol) return;
+    shoppingCol.doc(item.id).delete().catch(() => {});
+  }
+
+  shoppingForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = shoppingNameInput.value.trim();
+    if (!name || !shoppingCol) return;
+    const newItem = { id: genId(), name, qty: shoppingQtyInput.value.trim(), addedAt: new Date().toISOString() };
+    shoppingCol.doc(newItem.id).set(newItem).catch(() => {});
+    shoppingForm.reset();
+    shoppingNameInput.focus();
+  });
+
+  clearBtn.addEventListener("click", () => {
+    if (!dbRef || shoppingItems.length === 0) return;
+    if (!confirm("Clear your entire shopping list?")) return;
+    const batch = dbRef.batch();
+    shoppingItems.forEach(item => batch.delete(shoppingCol.doc(item.id)));
+    batch.commit().catch(() => {});
+  });
+
+  function init() {
+    const activeDb = window.GroceryTracker ? window.GroceryTracker.getDb() : null;
+    if (!activeDb) {
+      emptyState.hidden = false;
+      emptyState.textContent = "Not connected — check your Firebase config.";
+      return;
+    }
+    dbRef = activeDb;
+    shoppingCol = activeDb.collection("shoppingList");
+    shoppingCol.onSnapshot(
+      snapshot => {
+        shoppingItems = snapshot.docs.map(d => d.data());
+        render();
+      },
+      err => {
+        console.error("Shopping list sync error", err);
+        listContainer.innerHTML = "";
+        emptyState.hidden = false;
+        emptyState.textContent = err.code === "permission-denied"
+          ? "Can't sync — add a \"shoppingList\" rule in your Firestore rules (same as groceryItems)."
+          : "Sync error — check your connection.";
+      }
+    );
+  }
+
+  init();
 })();
 </script>
 </body>
