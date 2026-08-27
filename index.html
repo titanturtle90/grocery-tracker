@@ -607,6 +607,43 @@ button {
 #bogoMealPrepBtn:hover { background: var(--accent-dark); }
 #bogoMealPrepBtn:disabled { opacity: 0.6; cursor: default; }
 
+.pairing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.pairing-card {
+  background: var(--surface);
+  border: 1px solid var(--fresh-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+.pairing-card-items {
+  font-size: 0.78rem;
+  color: var(--accent);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+.pairing-card-idea {
+  font-size: 0.98rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.pairing-card button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.pairing-card button:hover { border-color: var(--accent); color: var(--accent); }
+
 @media (max-width: 700px) {
   .add-form { grid-template-columns: 1fr 1fr; }
   .field-storage { grid-column: span 1; }
@@ -1086,6 +1123,91 @@ const FIREBASE_CONFIG = {
   }
 
   global.BogoCategories = { lookup, CATEGORY_ORDER };
+})(window);
+</script>
+
+<script>
+/*
+ * Curated ingredient-pairing ideas: "if BOTH of these are on BOGO this
+ * week, here's a specific meal to make with them." Not a recipe-database
+ * search — a hand-authored knowledge base of common pairings, matched
+ * against whatever's actually on this week's BOGO list.
+ */
+(function (global) {
+  "use strict";
+
+  function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function compile(keywords) {
+    return keywords.map(kw => new RegExp("\\b" + escapeRegExp(kw) + "s?\\b", "i"));
+  }
+
+  function findItem(itemNames, patterns, exclude) {
+    for (const name of itemNames) {
+      if (exclude && exclude.has(name)) continue;
+      if (patterns.some(re => re.test(name))) return name;
+    }
+    return null;
+  }
+
+  const RULES = [
+    { a: ["chicken breast", "chicken"], b: ["greek yogurt", "yogurt"], idea: "Greek yogurt chicken rice bowls with tzatziki sauce" },
+    { a: ["chicken"], b: ["rice"], idea: "Simple chicken and rice bowls with your favorite seasoning" },
+    { a: ["chicken"], b: ["pasta", "penne", "tortelloni", "ramen"], idea: "Creamy chicken pasta bake" },
+    { a: ["chicken"], b: ["tortilla"], idea: "Chicken tacos, fajitas, or quesadillas" },
+    { a: ["chicken"], b: ["broccoli"], idea: "Chicken and broccoli stir-fry" },
+    { a: ["chicken"], b: ["avocado", "guacamole"], idea: "Chicken avocado wraps" },
+    { a: ["chicken"], b: ["cheese", "mozzarella", "parmigiano", "cheddar"], idea: "Cheesy baked chicken" },
+    { a: ["chicken"], b: ["alfredo"], idea: "Chicken alfredo pasta" },
+    { a: ["ground beef", "ground turkey"], b: ["tortilla", "taco shell"], idea: "Ground beef tacos meal prep" },
+    { a: ["ground beef", "ground turkey"], b: ["salsa"], idea: "Taco meat with fresh salsa" },
+    { a: ["ground beef", "ground turkey"], b: ["pasta", "penne"], idea: "Beef and pasta skillet" },
+    { a: ["ground beef", "ground turkey"], b: ["rice"], idea: "Beef and rice stuffed peppers or bowls" },
+    { a: ["ground beef", "ground turkey"], b: ["cheese", "cheddar"], idea: "Cheesy taco bake or smash burgers" },
+    { a: ["pork", "pork loin", "pork chop"], b: ["rice"], idea: "Pork fried rice" },
+    { a: ["pork", "pork loin", "pork chop"], b: ["apple"], idea: "Pork chops with sautéed apples" },
+    { a: ["shrimp"], b: ["pasta", "penne"], idea: "Garlic shrimp scampi pasta" },
+    { a: ["shrimp"], b: ["rice"], idea: "Shrimp fried rice" },
+    { a: ["shrimp"], b: ["avocado", "guacamole"], idea: "Shrimp avocado salad" },
+    { a: ["salmon"], b: ["rice"], idea: "Teriyaki salmon rice bowls" },
+    { a: ["tuna"], b: ["pasta", "penne"], idea: "Tuna pasta salad" },
+    { a: ["turkey", "ham"], b: ["bread", "bun", "roll"], idea: "Deli sandwiches or paninis" },
+    { a: ["bacon"], b: ["egg"], idea: "Bacon and egg breakfast skillet" },
+    { a: ["sausage"], b: ["egg"], idea: "Sausage and egg breakfast scramble" },
+    { a: ["bacon", "sausage"], b: ["waffle", "pancake"], idea: "Big weekend breakfast plate" },
+    { a: ["beef", "steak"], b: ["pepper", "bell pepper"], idea: "Beef and pepper fajitas" },
+    { a: ["cheese", "cheddar", "mozzarella"], b: ["bread", "bun"], idea: "Grilled cheese sandwiches" },
+    { a: ["cream cheese"], b: ["bagel"], idea: "Bagels with cream cheese" },
+    { a: ["tortilla", "taco shell"], b: ["salsa"], idea: "Taco night with fresh salsa" },
+    { a: ["tortilla"], b: ["guacamole", "avocado"], idea: "Guac-loaded quesadillas" },
+    { a: ["pasta", "penne", "spaghetti"], b: ["marinara", "tomato sauce"], idea: "Classic pasta marinara" },
+    { a: ["pasta", "penne"], b: ["pesto"], idea: "Pesto pasta" },
+    { a: ["pasta", "penne"], b: ["cheese", "cheddar"], idea: "Baked mac and cheese" },
+    { a: ["bread"], b: ["egg"], idea: "French toast for breakfast" },
+    { a: ["yogurt", "greek yogurt"], b: ["granola"], idea: "Yogurt parfaits" },
+    { a: ["peanut butter"], b: ["bread"], idea: "PB sandwiches" },
+    { a: ["hummus"], b: ["cucumber", "pepper", "carrot"], idea: "Veggies and hummus snack plate" },
+    { a: ["pizza dough", "pizza"], b: ["cheese", "mozzarella"], idea: "Extra-cheesy homemade pizza" }
+  ];
+
+  const COMPILED_RULES = RULES.map(r => ({ ...r, aPat: compile(r.a), bPat: compile(r.b) }));
+
+  function findMatches(itemNames) {
+    const results = [];
+    COMPILED_RULES.forEach(rule => {
+      const itemA = findItem(itemNames, rule.aPat);
+      if (!itemA) return;
+      const exclude = new Set([itemA]);
+      const itemB = findItem(itemNames, rule.bPat, exclude);
+      if (!itemB) return;
+      results.push({ itemA, itemB, idea: rule.idea });
+    });
+    return results;
+  }
+
+  global.MealPairings = { findMatches };
 })(window);
 </script>
 
@@ -2390,30 +2512,54 @@ if ("serviceWorker" in navigator) {
     batch.commit().catch(() => {});
   });
 
-  mealPrepBtn.addEventListener("click", async () => {
+  mealPrepBtn.addEventListener("click", () => {
     if (bogoItems.length === 0) {
-      mealPrepStatus.textContent = "Add some BOGO items first.";
+      mealPrepStatus.textContent = "No BOGO items yet.";
       return;
     }
-    if (!window.RecipeSearch) {
-      mealPrepStatus.textContent = "Recipe search isn't ready yet — try again in a moment.";
+    if (!window.MealPairings) {
+      mealPrepStatus.textContent = "Pairing engine isn't ready yet — try again in a moment.";
       return;
     }
-    mealPrepBtn.disabled = true;
-    mealPrepStatus.textContent = "Generating meal prep ideas…";
+
+    const names = bogoItems.map(i => i.name);
+    const matches = window.MealPairings.findMatches(names);
     mealPrepResults.innerHTML = "";
 
-    try {
-      const names = bogoItems.map(i => i.name);
-      const { recipes, unmatched } = await window.RecipeSearch.searchRecipes(names, "", []);
-      window.RecipeSearch.renderRecipes(mealPrepResults, recipes, unmatched);
-      mealPrepStatus.textContent = recipes.length ? `Found ${recipes.length} idea${recipes.length === 1 ? "" : "s"}.` : "";
-    } catch (e) {
-      console.error("BOGO meal prep search failed", e);
-      mealPrepStatus.textContent = "Couldn't generate ideas — check your connection.";
-    } finally {
-      mealPrepBtn.disabled = false;
+    if (matches.length === 0) {
+      mealPrepStatus.textContent = "";
+      const empty = document.createElement("p");
+      empty.className = "empty-state";
+      empty.textContent = "No obvious pairings found in this week's BOGO items.";
+      mealPrepResults.appendChild(empty);
+      return;
     }
+
+    mealPrepStatus.textContent = `Found ${matches.length} pairing idea${matches.length === 1 ? "" : "s"}.`;
+
+    const grid = document.createElement("div");
+    grid.className = "pairing-grid";
+
+    matches.forEach(m => {
+      const card = document.createElement("div");
+      card.className = "pairing-card";
+      card.innerHTML = `
+        <div class="pairing-card-items">${escapeHtml(m.itemA)} + ${escapeHtml(m.itemB)}</div>
+        <div class="pairing-card-idea">${escapeHtml(m.idea)}</div>
+        <button type="button">+ Add both to Shopping List</button>
+      `;
+      card.querySelector("button").addEventListener("click", () => {
+        const sl = window.ShoppingListModule;
+        const gt = window.GroceryTracker;
+        if (!sl) return;
+        sl.addToShoppingList(m.itemA);
+        sl.addToShoppingList(m.itemB);
+        if (gt) gt.showToast(`Added ${m.itemA} and ${m.itemB} to your shopping list.`);
+      });
+      grid.appendChild(card);
+    });
+
+    mealPrepResults.appendChild(grid);
   });
 
   function init() {
