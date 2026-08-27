@@ -372,6 +372,111 @@ button {
 }
 .toast-action:hover { opacity: 0.8; }
 
+.tab-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 10px 4px;
+  margin-bottom: -1px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-btn:hover { color: var(--accent); }
+
+.recipe-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.recipe-check-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 6px 12px 6px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.recipe-check-item input { margin: 0; }
+.recipe-check-item.expired { background: var(--expired-bg); border-color: var(--expired-border); color: var(--expired-fg); }
+.recipe-check-item.today { background: var(--today-bg); border-color: var(--today-border); color: var(--today-fg); }
+.recipe-check-item.soon { background: var(--soon-bg); border-color: var(--soon-border); color: var(--soon-fg); }
+.recipe-check-item.fresh { background: var(--fresh-bg); border-color: var(--fresh-border); color: var(--fresh-fg); }
+
+.recipe-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+#findRecipesBtn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 600;
+}
+#findRecipesBtn:hover { background: var(--accent-dark); }
+#findRecipesBtn:disabled { opacity: 0.6; cursor: default; }
+.recipe-status { font-size: 0.85rem; color: var(--text-muted); }
+
+.recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.recipe-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+.recipe-card img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: var(--bg); }
+.recipe-card-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.recipe-card-title { font-weight: 600; font-size: 0.95rem; }
+.recipe-card-match { font-size: 0.78rem; color: var(--accent); }
+.recipe-card-toggle {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.recipe-card-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.recipe-card-toggle:disabled { opacity: 0.6; cursor: default; }
+.recipe-detail {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.recipe-detail h4 { margin: 0 0 4px; font-size: 0.82rem; color: var(--text); }
+.recipe-detail ul { margin: 0 0 10px; padding-left: 18px; }
+
 @media (max-width: 700px) {
   .add-form { grid-template-columns: 1fr 1fr; }
   .field-storage { grid-column: span 1; }
@@ -393,6 +498,13 @@ button {
     </div>
     <span id="syncStatus" class="sync-status">🔄 Connecting…</span>
   </header>
+
+  <nav class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="groceries" type="button">🛒 Groceries</button>
+    <button class="tab-btn" data-tab="recipes" type="button">🍳 Recipes</button>
+  </nav>
+
+  <div id="groceriesPanel">
 
   <section class="summary-bar" id="summaryBar">
     <div class="summary-pill expired" data-filter="expired">
@@ -460,6 +572,19 @@ button {
     <p id="emptyState" class="empty-state" hidden>No groceries yet. Add something above to get started.</p>
     <div id="groupsContainer"></div>
   </section>
+
+  </div>
+
+  <div id="recipesPanel" hidden>
+    <p class="subtitle">Pick what you want to use up, and I'll find recipes built around it.</p>
+    <div id="recipeChecklist" class="recipe-checklist"></div>
+    <div class="recipe-actions">
+      <button id="findRecipesBtn" type="button">Find Recipes</button>
+      <span id="recipeStatus" class="recipe-status"></span>
+    </div>
+    <div id="recipeResults"></div>
+    <p class="recipe-status" style="margin-top:24px;">Recipes courtesy of <a href="https://www.themealdb.com" target="_blank" rel="noopener">TheMealDB</a>.</p>
+  </div>
 
 </div>
 
@@ -1177,6 +1302,8 @@ const FIREBASE_CONFIG = {
     itemExpiryInput.value = addDays(7);
   })();
 
+  window.GroceryTracker = { getItems: () => items, urgencyOf };
+
   render();
   initFirebase();
 })();
@@ -1189,6 +1316,268 @@ if ("serviceWorker" in navigator) {
     window.addEventListener("load", registerSW);
   }
 }
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  const tabBar = document.getElementById("tabBar");
+  const groceriesPanel = document.getElementById("groceriesPanel");
+  const recipesPanel = document.getElementById("recipesPanel");
+  const checklistEl = document.getElementById("recipeChecklist");
+  const findBtn = document.getElementById("findRecipesBtn");
+  const statusEl = document.getElementById("recipeStatus");
+  const resultsEl = document.getElementById("recipeResults");
+
+  const MEALDB_BASE = "https://www.themealdb.com/api/json/v1/1/";
+  const INGREDIENT_CACHE_KEY = "grocery-tracker-mealdb-ingredients-v1";
+  const INGREDIENT_CACHE_DAYS = 30;
+
+  let canonicalIngredients = null;
+  const recipeDetailCache = new Map();
+  let checklistPopulated = false;
+
+  // ---------- tab switching ----------
+
+  tabBar.addEventListener("click", e => {
+    const btn = e.target.closest(".tab-btn");
+    if (!btn) return;
+    const tab = btn.dataset.tab;
+    tabBar.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
+    groceriesPanel.hidden = tab !== "groceries";
+    recipesPanel.hidden = tab !== "recipes";
+    if (tab === "recipes" && !checklistPopulated) {
+      populateChecklist();
+      checklistPopulated = true;
+    }
+  });
+
+  // ---------- helpers ----------
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[ch]));
+  }
+
+  function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  // ---------- canonical ingredient list (cached ~30 days) ----------
+
+  async function getCanonicalIngredients() {
+    if (canonicalIngredients) return canonicalIngredients;
+    try {
+      const cached = JSON.parse(localStorage.getItem(INGREDIENT_CACHE_KEY) || "null");
+      if (cached && Date.now() - cached.fetchedAt < INGREDIENT_CACHE_DAYS * 86400000) {
+        canonicalIngredients = cached.names;
+        return canonicalIngredients;
+      }
+    } catch (e) { /* corrupt cache — refetch */ }
+
+    const res = await fetch(MEALDB_BASE + "list.php?i=list");
+    const data = await res.json();
+    const names = (data.meals || []).map(m => m.strIngredient).filter(Boolean);
+    canonicalIngredients = names;
+    try {
+      localStorage.setItem(INGREDIENT_CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), names }));
+    } catch (e) { /* storage unavailable — just won't cache */ }
+    return names;
+  }
+
+  function findCanonicalIngredient(itemName, canonicalList) {
+    const shelfMatch = window.ShelfLifeDB ? window.ShelfLifeDB.lookup(itemName) : null;
+    const candidates = [];
+    if (shelfMatch) candidates.push(shelfMatch.matchedKeyword);
+    candidates.push(itemName.toLowerCase().trim());
+
+    for (const cand of candidates) {
+      if (!cand) continue;
+      let hit = canonicalList.find(c => c.toLowerCase() === cand);
+      if (hit) return hit;
+      const re = new RegExp("\\b" + escapeRegExp(cand) + "\\b", "i");
+      hit = canonicalList.find(c => re.test(c));
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  // ---------- checklist ----------
+
+  function populateChecklist() {
+    const items = window.GroceryTracker ? window.GroceryTracker.getItems() : [];
+
+    if (items.length === 0) {
+      checklistEl.innerHTML = '<p class="empty-state" style="padding:20px 0;">Add some groceries first, then come back here for recipe ideas.</p>';
+      findBtn.disabled = true;
+      return;
+    }
+
+    findBtn.disabled = false;
+    const sorted = [...items].sort((a, b) => a.expiry.localeCompare(b.expiry));
+    checklistEl.innerHTML = sorted.map(item => {
+      const urgency = window.GroceryTracker.urgencyOf(item.expiry);
+      const checked = urgency !== "fresh" ? "checked" : "";
+      return `<label class="recipe-check-item ${urgency}"><input type="checkbox" value="${escapeHtml(item.name)}" ${checked}>${escapeHtml(item.name)}</label>`;
+    }).join("");
+  }
+
+  // ---------- search ----------
+
+  async function searchRecipes(selectedNames) {
+    const canonicalList = await getCanonicalIngredients();
+    const mapped = selectedNames
+      .map(name => ({ name, canonical: findCanonicalIngredient(name, canonicalList) }))
+      .filter(m => m.canonical);
+    const unmatched = selectedNames.filter(name => !mapped.some(m => m.name === name));
+
+    if (mapped.length === 0) return { recipes: [], unmatched: selectedNames };
+
+    const perIngredient = await Promise.all(mapped.map(async m => {
+      const url = MEALDB_BASE + "filter.php?i=" + encodeURIComponent(m.canonical.replace(/\s+/g, "_"));
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        return { item: m.name, meals: data.meals || [] };
+      } catch (e) {
+        return { item: m.name, meals: [] };
+      }
+    }));
+
+    // Cap each ingredient's own contribution before merging, so one very
+    // common ingredient (e.g. chicken) can't crowd out a less common one.
+    const PER_INGREDIENT_CAP = 8;
+    const mealMap = new Map();
+    perIngredient.forEach(({ item, meals }) => {
+      meals.slice(0, PER_INGREDIENT_CAP).forEach(meal => {
+        if (!mealMap.has(meal.idMeal)) {
+          mealMap.set(meal.idMeal, { idMeal: meal.idMeal, strMeal: meal.strMeal, strMealThumb: meal.strMealThumb, matchedItems: [] });
+        }
+        mealMap.get(meal.idMeal).matchedItems.push(item);
+      });
+    });
+
+    const recipes = Array.from(mealMap.values())
+      .sort((a, b) => b.matchedItems.length - a.matchedItems.length)
+      .slice(0, 24);
+
+    return { recipes, unmatched };
+  }
+
+  async function getRecipeDetail(idMeal) {
+    if (recipeDetailCache.has(idMeal)) return recipeDetailCache.get(idMeal);
+    const res = await fetch(MEALDB_BASE + "lookup.php?i=" + encodeURIComponent(idMeal));
+    const data = await res.json();
+    const meal = (data.meals || [])[0] || null;
+    recipeDetailCache.set(idMeal, meal);
+    return meal;
+  }
+
+  function extractIngredients(meal) {
+    const list = [];
+    for (let i = 1; i <= 20; i++) {
+      const ing = meal["strIngredient" + i];
+      const measure = meal["strMeasure" + i];
+      if (ing && ing.trim()) {
+        list.push(`${measure && measure.trim() ? measure.trim() + " " : ""}${ing.trim()}`);
+      }
+    }
+    return list;
+  }
+
+  function renderRecipes(recipes, unmatched) {
+    resultsEl.innerHTML = "";
+
+    if (unmatched.length > 0) {
+      const note = document.createElement("p");
+      note.className = "recipe-status";
+      note.style.marginBottom = "10px";
+      note.textContent = `No recipe match found for: ${unmatched.join(", ")}.`;
+      resultsEl.appendChild(note);
+    }
+
+    if (recipes.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "empty-state";
+      empty.textContent = "No recipes found for the selected items. Try selecting different ones.";
+      resultsEl.appendChild(empty);
+      return;
+    }
+
+    const grid = document.createElement("div");
+    grid.className = "recipe-grid";
+
+    recipes.forEach(recipe => {
+      const card = document.createElement("div");
+      card.className = "recipe-card";
+      card.innerHTML = `
+        <img src="${escapeHtml(recipe.strMealThumb)}" alt="${escapeHtml(recipe.strMeal)}" loading="lazy">
+        <div class="recipe-card-body">
+          <div class="recipe-card-title">${escapeHtml(recipe.strMeal)}</div>
+          <div class="recipe-card-match">Uses: ${recipe.matchedItems.map(escapeHtml).join(", ")}</div>
+          <button type="button" class="recipe-card-toggle">View recipe</button>
+          <div class="recipe-detail" hidden></div>
+        </div>
+      `;
+
+      const toggleBtn = card.querySelector(".recipe-card-toggle");
+      const detailEl = card.querySelector(".recipe-detail");
+
+      toggleBtn.addEventListener("click", async () => {
+        if (!detailEl.hidden) {
+          detailEl.hidden = true;
+          toggleBtn.textContent = "View recipe";
+          return;
+        }
+        toggleBtn.textContent = "Loading…";
+        toggleBtn.disabled = true;
+        const meal = await getRecipeDetail(recipe.idMeal);
+        toggleBtn.disabled = false;
+        if (!meal) {
+          detailEl.innerHTML = "<p>Couldn't load this recipe.</p>";
+        } else {
+          const ingredients = extractIngredients(meal);
+          detailEl.innerHTML = `
+            <h4>Ingredients</h4>
+            <ul>${ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+            <h4>Instructions</h4>
+            <div>${escapeHtml(meal.strInstructions || "").replace(/\n+/g, "<br><br>")}</div>
+          `;
+        }
+        detailEl.hidden = false;
+        toggleBtn.textContent = "Hide recipe";
+      });
+
+      grid.appendChild(card);
+    });
+
+    resultsEl.appendChild(grid);
+  }
+
+  findBtn.addEventListener("click", async () => {
+    const selected = Array.from(checklistEl.querySelectorAll("input[type=checkbox]:checked")).map(cb => cb.value);
+    if (selected.length === 0) {
+      statusEl.textContent = "Select at least one item first.";
+      return;
+    }
+    findBtn.disabled = true;
+    statusEl.textContent = "Searching recipes…";
+    resultsEl.innerHTML = "";
+
+    try {
+      const { recipes, unmatched } = await searchRecipes(selected);
+      renderRecipes(recipes, unmatched);
+      statusEl.textContent = recipes.length ? `Found ${recipes.length} recipe${recipes.length === 1 ? "" : "s"}.` : "";
+    } catch (e) {
+      console.error("Recipe search failed", e);
+      statusEl.textContent = "Recipe search unavailable — check your connection.";
+    } finally {
+      findBtn.disabled = false;
+    }
+  });
+})();
 </script>
 </body>
 </html>
