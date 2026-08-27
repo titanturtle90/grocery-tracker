@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery Tracker</title>
+<style>
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --border: #e3e6e1;
+  --text: #232823;
+  --text-muted: #6b7268;
+  --accent: #3f7d4f;
+  --accent-dark: #2e5e3a;
+
+  --expired-bg: #fdecea;
+  --expired-fg: #b3261e;
+  --expired-border: #f3c6c1;
+
+  --today-bg: #fff1e0;
+  --today-fg: #b5590a;
+  --today-border: #f7d5a8;
+
+  --soon-bg: #fdf6db;
+  --soon-fg: #8a6d00;
+  --soon-border: #ecdd9c;
+
+  --fresh-bg: #e9f5ea;
+  --fresh-fg: #2e6b3a;
+  --fresh-border: #bfe0c4;
+
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(20, 30, 20, 0.08), 0 1px 2px rgba(20, 30, 20, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171a17;
+    --surface: #202420;
+    --border: #2e332e;
+    --text: #e9ece8;
+    --text-muted: #9aa39a;
+    --accent: #59a86c;
+    --accent-dark: #6fc282;
+
+    --expired-bg: #3a1e1c;
+    --expired-fg: #ff8a80;
+    --expired-border: #5c2d29;
+
+    --today-bg: #3a2a15;
+    --today-fg: #ffb066;
+    --today-border: #5c4321;
+
+    --soon-bg: #34301a;
+    --soon-fg: #e8cf5e;
+    --soon-border: #524b28;
+
+    --fresh-bg: #1c3220;
+    --fresh-fg: #7fd18f;
+    --fresh-border: #2c4d33;
+
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.app-header h1 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+}
+
+.subtitle {
+  margin: 0 0 20px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.sync-status {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+.sync-status.synced { color: var(--fresh-fg); border-color: var(--fresh-border); }
+.sync-status.error { color: var(--expired-fg); border-color: var(--expired-border); }
+
+.summary-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.summary-pill {
+  border-radius: var(--radius);
+  padding: 10px 8px;
+  text-align: center;
+  border: 1px solid;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease, filter 0.1s ease;
+}
+.summary-pill:hover { filter: brightness(0.97); }
+.summary-pill.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.summary-pill .count { display: block; font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
+.summary-pill .label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+
+.summary-pill.expired { background: var(--expired-bg); color: var(--expired-fg); border-color: var(--expired-border); }
+.summary-pill.today { background: var(--today-bg); color: var(--today-fg); border-color: var(--today-border); }
+.summary-pill.soon { background: var(--soon-bg); color: var(--soon-fg); border-color: var(--soon-border); }
+.summary-pill.fresh { background: var(--fresh-bg); color: var(--fresh-fg); border-color: var(--fresh-border); }
+
+.add-form-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.add-form {
+  display: grid;
+  grid-template-columns: 1.8fr 0.9fr 1.2fr 1fr 1.1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.expiry-hint {
+  margin: 10px 2px 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-height: 1em;
+}
+
+.expiry-hint.has-match { color: var(--accent); }
+
+.expiry-hint .link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 0.75rem; color: var(--text-muted); }
+
+input[type="text"], input[type="date"], select {
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+input:focus, select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+button {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.field-submit button, .add-form > button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.field-submit button:hover { background: var(--accent-dark); }
+
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.controls input[type="text"] { flex: 1; min-width: 160px; }
+.controls select { max-width: 200px; }
+
+.ghost-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.ghost-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.group {
+  margin-bottom: 22px;
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px 2px;
+}
+
+.group-title .dot {
+  width: 9px; height: 9px; border-radius: 50%;
+}
+.group.expired .dot { background: var(--expired-fg); }
+.group.today .dot { background: var(--today-fg); }
+.group.soon .dot { background: var(--soon-fg); }
+.group.fresh .dot { background: var(--fresh-fg); }
+
+.group.expired .group-title { color: var(--expired-fg); }
+.group.today .group-title { color: var(--today-fg); }
+.group.soon .group-title { color: var(--soon-fg); }
+.group.fresh .group-title { color: var(--fresh-fg); }
+
+.item-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow);
+}
+
+.item-card.expired { border-left-color: var(--expired-fg); }
+.item-card.today { border-left-color: var(--today-fg); }
+.item-card.soon { border-left-color: var(--soon-fg); }
+.item-card.fresh { border-left-color: var(--fresh-fg); }
+
+.item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-name {
+  font-weight: 600;
+  font-size: 0.98rem;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.item-meta .badge {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.item-expiry-note {
+  font-weight: 600;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.item-card.expired .item-expiry-note { color: var(--expired-fg); }
+.item-card.today .item-expiry-note { color: var(--today-fg); }
+.item-card.soon .item-expiry-note { color: var(--soon-fg); }
+.item-card.fresh .item-expiry-note { color: var(--fresh-fg); }
+
+.item-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.icon-btn.danger:hover { border-color: var(--expired-fg); color: var(--expired-fg); }
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 10px;
+  font-size: 0.95rem;
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 10px 10px 18px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  box-shadow: var(--shadow);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 90vw;
+}
+
+.toast-action {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.toast-action:hover { opacity: 0.8; }
+
+@media (max-width: 700px) {
+  .add-form { grid-template-columns: 1fr 1fr; }
+  .field-storage { grid-column: span 1; }
+  .field-submit { grid-column: 1 / -1; }
+  .field-submit button { width: 100%; }
+  .summary-bar { grid-template-columns: repeat(2, 1fr); }
+  .item-card { flex-wrap: wrap; }
+  .item-expiry-note { order: 3; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <div>
+      <h1>🥕 Grocery Tracker</h1>
+      <p class="subtitle">Track what you have. Eat it before it's gone.</p>
+    </div>
+    <span id="syncStatus" class="sync-status">🔄 Connecting…</span>
+  </header>
+
+  <section class="summary-bar" id="summaryBar">
+    <div class="summary-pill expired" data-filter="expired">
+      <span class="count" id="countExpired">0</span><span class="label">Expired</span>
+    </div>
+    <div class="summary-pill today" data-filter="today">
+      <span class="count" id="countToday">0</span><span class="label">Eat Today</span>
+    </div>
+    <div class="summary-pill soon" data-filter="soon">
+      <span class="count" id="countSoon">0</span><span class="label">Eat Soon</span>
+    </div>
+    <div class="summary-pill fresh" data-filter="fresh">
+      <span class="count" id="countFresh">0</span><span class="label">Fresh</span>
+    </div>
+  </section>
+
+  <section class="add-form-section">
+    <form id="addForm" class="add-form">
+      <div class="field field-name">
+        <label for="itemName">Item</label>
+        <input type="text" id="itemName" placeholder="e.g. Spinach" required>
+      </div>
+      <div class="field field-qty">
+        <label for="itemQty">Qty</label>
+        <input type="text" id="itemQty" placeholder="1 bag">
+      </div>
+      <div class="field field-category">
+        <label for="itemCategory">Category</label>
+        <select id="itemCategory">
+          <option value="Produce">Produce</option>
+          <option value="Dairy">Dairy</option>
+          <option value="Meat &amp; Seafood">Meat &amp; Seafood</option>
+          <option value="Bakery">Bakery</option>
+          <option value="Frozen">Frozen</option>
+          <option value="Pantry">Pantry</option>
+          <option value="Beverages">Beverages</option>
+          <option value="Leftovers">Leftovers</option>
+          <option value="Other" selected>Other</option>
+        </select>
+      </div>
+      <div class="field field-storage">
+        <label for="itemStorage">Storage</label>
+        <select id="itemStorage"></select>
+      </div>
+      <div class="field field-date">
+        <label for="itemExpiry">Expires</label>
+        <input type="date" id="itemExpiry" required>
+      </div>
+      <div class="field field-submit">
+        <button type="submit">Add Item</button>
+      </div>
+    </form>
+    <p id="expiryHint" class="expiry-hint"></p>
+  </section>
+
+  <section class="controls">
+    <input type="text" id="searchBox" placeholder="Search items...">
+    <select id="categoryFilter">
+      <option value="">All categories</option>
+    </select>
+    <button id="clearFilters" class="ghost-btn" type="button">Clear filters</button>
+  </section>
+
+  <section class="list-section">
+    <p id="emptyState" class="empty-state" hidden>No groceries yet. Add something above to get started.</p>
+    <div id="groupsContainer"></div>
+  </section>
+
+</div>
+
+<div id="toast" class="toast" hidden>
+  <span id="toastMessage"></span>
+  <button id="toastActionBtn" class="toast-action" type="button" hidden></button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+// ============================================================
+// FIREBASE CONFIG — replace with the config from your own
+// Firebase project (Project settings > General > Your apps > SDK setup).
+// ============================================================
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA9rsB-BDmgiUvHmlw8WndbesNPuZkQvzA",
+  authDomain: "grocery-tracker-b45f1.firebaseapp.com",
+  projectId: "grocery-tracker-b45f1",
+  storageBucket: "grocery-tracker-b45f1.firebasestorage.app",
+  messagingSenderId: "423451125428",
+  appId: "1:423451125428:web:a47b6999f9e20b8f7a99e1"
+};
+</script>
+
+<script>
+/*
+ * Shelf-life reference data, in days from the day an item is added, by
+ * storage location. General consumer guidance, not food-safety
+ * guarantees — always trust your own senses and any printed date over
+ * this estimate.
+ */
+(function (global) {
+  "use strict";
+
+  const STORAGE_OPTIONS = [
+    { value: "counter", label: "Counter", icon: "🍽️" },
+    { value: "pantry", label: "Pantry", icon: "🗄️" },
+    { value: "fridge", label: "Fridge", icon: "🧊" },
+    { value: "freezer", label: "Freezer", icon: "❄️" }
+  ];
+
+  const ENTRIES = [
+    { keywords: ["apple"], life: { counter: 7, fridge: 35, freezer: 240 }, defaultStorage: "fridge" },
+    { keywords: ["banana"], life: { counter: 5, fridge: 7 }, defaultStorage: "counter" },
+    { keywords: ["orange"], life: { counter: 7, fridge: 21 }, defaultStorage: "fridge" },
+    { keywords: ["mandarin", "clementine", "tangerine"], life: { counter: 7, fridge: 21 }, defaultStorage: "fridge" },
+    { keywords: ["lemon"], life: { counter: 7, fridge: 28 }, defaultStorage: "fridge" },
+    { keywords: ["lime"], life: { counter: 7, fridge: 28 }, defaultStorage: "fridge" },
+    { keywords: ["grape"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["strawberry"], life: { fridge: 5 }, defaultStorage: "fridge" },
+    { keywords: ["blueberry"], life: { fridge: 10 }, defaultStorage: "fridge" },
+    { keywords: ["raspberry"], life: { fridge: 3 }, defaultStorage: "fridge" },
+    { keywords: ["blackberry"], life: { fridge: 5 }, defaultStorage: "fridge" },
+    { keywords: ["pineapple"], life: { counter: 3, fridge: 5 }, defaultStorage: "counter" },
+    { keywords: ["watermelon"], life: { counter: 10, fridge: 5 }, defaultStorage: "counter" },
+    { keywords: ["cantaloupe", "melon", "honeydew"], life: { counter: 4, fridge: 7 }, defaultStorage: "counter" },
+    { keywords: ["mango"], life: { counter: 5, fridge: 7 }, defaultStorage: "counter" },
+    { keywords: ["avocado"], life: { counter: 5, fridge: 7 }, defaultStorage: "counter" },
+    { keywords: ["peach", "nectarine"], life: { counter: 4, fridge: 7 }, defaultStorage: "counter" },
+    { keywords: ["pear"], life: { counter: 5, fridge: 14 }, defaultStorage: "counter" },
+    { keywords: ["plum"], life: { counter: 4, fridge: 7 }, defaultStorage: "counter" },
+    { keywords: ["kiwi"], life: { counter: 7, fridge: 28 }, defaultStorage: "counter" },
+    { keywords: ["cherry"], life: { fridge: 10 }, defaultStorage: "fridge" },
+    { keywords: ["broccoli"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["cauliflower"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["carrot"], life: { fridge: 28 }, defaultStorage: "fridge" },
+    { keywords: ["celery"], life: { fridge: 14 }, defaultStorage: "fridge" },
+    { keywords: ["cucumber"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["zucchini"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["winter squash", "butternut squash", "acorn squash"], life: { pantry: 60, fridge: 14 }, defaultStorage: "pantry" },
+    { keywords: ["squash", "summer squash"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["bell pepper", "pepper"], life: { fridge: 10 }, defaultStorage: "fridge" },
+    { keywords: ["tomato"], life: { counter: 5, fridge: 7 }, defaultStorage: "counter" },
+    { keywords: ["sweet potato", "yam"], life: { pantry: 35 }, defaultStorage: "pantry" },
+    { keywords: ["potato"], life: { pantry: 45 }, defaultStorage: "pantry" },
+    { keywords: ["onion"], life: { pantry: 30 }, defaultStorage: "pantry" },
+    { keywords: ["garlic"], life: { pantry: 120 }, defaultStorage: "pantry" },
+    { keywords: ["ginger"], life: { fridge: 21 }, defaultStorage: "fridge" },
+    { keywords: ["lettuce"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["spinach"], life: { fridge: 5 }, defaultStorage: "fridge" },
+    { keywords: ["kale"], life: { fridge: 5 }, defaultStorage: "fridge" },
+    { keywords: ["cabbage"], life: { fridge: 30 }, defaultStorage: "fridge" },
+    { keywords: ["mushroom"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["green bean"], life: { fridge: 5 }, defaultStorage: "fridge" },
+    { keywords: ["corn"], life: { fridge: 3 }, defaultStorage: "fridge" },
+    { keywords: ["asparagus"], life: { fridge: 4 }, defaultStorage: "fridge" },
+    { keywords: ["eggplant"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["radish"], life: { fridge: 14 }, defaultStorage: "fridge" },
+    { keywords: ["beet"], life: { fridge: 21 }, defaultStorage: "fridge" },
+    { keywords: ["brussels sprout"], life: { fridge: 10 }, defaultStorage: "fridge" },
+    { keywords: ["artichoke"], life: { fridge: 5 }, defaultStorage: "fridge" },
+    { keywords: ["basil"], life: { counter: 5, fridge: 7 }, defaultStorage: "counter" },
+    { keywords: ["cilantro", "parsley", "herb", "dill", "mint"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["pea"], life: { fridge: 5 }, defaultStorage: "fridge" },
+
+    { keywords: ["milk"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["egg"], life: { fridge: 28 }, defaultStorage: "fridge" },
+    { keywords: ["butter"], life: { fridge: 60, freezer: 270 }, defaultStorage: "fridge" },
+    { keywords: ["cream cheese"], life: { fridge: 10 }, defaultStorage: "fridge" },
+    { keywords: ["cottage cheese"], life: { fridge: 10 }, defaultStorage: "fridge" },
+    { keywords: ["sour cream"], life: { fridge: 21 }, defaultStorage: "fridge" },
+    { keywords: ["heavy cream", "half and half", "creamer"], life: { fridge: 10 }, defaultStorage: "fridge" },
+    { keywords: ["mozzarella"], life: { fridge: 14 }, defaultStorage: "fridge" },
+    { keywords: ["cheddar", "cheese"], life: { fridge: 30 }, defaultStorage: "fridge" },
+    { keywords: ["yogurt"], life: { fridge: 14 }, defaultStorage: "fridge" },
+
+    { keywords: ["chicken"], life: { fridge: 2, freezer: 270 }, defaultStorage: "fridge" },
+    { keywords: ["ground beef", "ground turkey", "ground pork"], life: { fridge: 2, freezer: 120 }, defaultStorage: "fridge" },
+    { keywords: ["steak", "beef"], life: { fridge: 4, freezer: 270 }, defaultStorage: "fridge" },
+    { keywords: ["pork"], life: { fridge: 4, freezer: 180 }, defaultStorage: "fridge" },
+    { keywords: ["bacon"], life: { fridge: 7, freezer: 150 }, defaultStorage: "fridge" },
+    { keywords: ["sausage"], life: { fridge: 2, freezer: 60 }, defaultStorage: "fridge" },
+    { keywords: ["salmon"], life: { fridge: 2, freezer: 90 }, defaultStorage: "fridge" },
+    { keywords: ["shrimp"], life: { fridge: 2, freezer: 180 }, defaultStorage: "fridge" },
+    { keywords: ["fish"], life: { fridge: 2, freezer: 180 }, defaultStorage: "fridge" },
+    { keywords: ["turkey"], life: { fridge: 2, freezer: 270 }, defaultStorage: "fridge" },
+    { keywords: ["deli meat", "lunch meat", "ham"], life: { fridge: 5 }, defaultStorage: "fridge" },
+    { keywords: ["hot dog"], life: { fridge: 7, freezer: 60 }, defaultStorage: "fridge" },
+    { keywords: ["tofu"], life: { fridge: 7 }, defaultStorage: "fridge" },
+
+    { keywords: ["bread"], life: { pantry: 5, fridge: 14, freezer: 90 }, defaultStorage: "pantry" },
+    { keywords: ["bagel"], life: { pantry: 5, freezer: 90 }, defaultStorage: "pantry" },
+    { keywords: ["tortilla"], life: { fridge: 21, pantry: 7 }, defaultStorage: "fridge" },
+
+    { keywords: ["rice"], life: { pantry: 730 }, defaultStorage: "pantry" },
+    { keywords: ["pasta"], life: { pantry: 730 }, defaultStorage: "pantry" },
+    { keywords: ["flour"], life: { pantry: 240 }, defaultStorage: "pantry" },
+    { keywords: ["sugar"], life: { pantry: 730 }, defaultStorage: "pantry" },
+    { keywords: ["cereal"], life: { pantry: 240 }, defaultStorage: "pantry" },
+    { keywords: ["canned bean", "canned soup", "canned vegetable", "canned good"], life: { pantry: 730 }, defaultStorage: "pantry" },
+    { keywords: ["peanut butter"], life: { pantry: 270 }, defaultStorage: "pantry" },
+    { keywords: ["honey"], life: { pantry: 1825 }, defaultStorage: "pantry" },
+    { keywords: ["oat"], life: { pantry: 365 }, defaultStorage: "pantry" },
+    { keywords: ["cracker"], life: { pantry: 180 }, defaultStorage: "pantry" },
+    { keywords: ["chip"], life: { pantry: 60 }, defaultStorage: "pantry" },
+    { keywords: ["coffee"], life: { pantry: 90 }, defaultStorage: "pantry" },
+    { keywords: ["tea"], life: { pantry: 365 }, defaultStorage: "pantry" },
+
+    { keywords: ["juice"], life: { fridge: 7 }, defaultStorage: "fridge" },
+    { keywords: ["soda", "pop"], life: { pantry: 270 }, defaultStorage: "pantry" },
+
+    { keywords: ["leftover"], life: { fridge: 4 }, defaultStorage: "fridge" },
+    { keywords: ["cooked rice"], life: { fridge: 5 }, defaultStorage: "fridge" },
+    { keywords: ["soup"], life: { fridge: 4 }, defaultStorage: "fridge" }
+  ];
+
+  const KEYWORD_MAP = new Map();
+  ENTRIES.forEach(entry => {
+    entry.keywords.forEach(kw => KEYWORD_MAP.set(kw, entry));
+  });
+
+  function singularize(word) {
+    if (word.length <= 3) return word;
+    if (word.endsWith("ies")) return word.slice(0, -3) + "y";
+    if (word.endsWith("oes")) return word.slice(0, -2);
+    if (word.endsWith("ches") || word.endsWith("shes") || word.endsWith("xes") || word.endsWith("ses")) {
+      return word.slice(0, -2);
+    }
+    if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+    return word;
+  }
+
+  function normalizeWords(str) {
+    return str
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(singularize);
+  }
+
+  function lookup(name) {
+    if (!name) return null;
+    const words = normalizeWords(name);
+    if (words.length === 0) return null;
+
+    const maxWindow = Math.min(3, words.length);
+    for (let windowSize = maxWindow; windowSize >= 1; windowSize--) {
+      for (let start = 0; start + windowSize <= words.length; start++) {
+        const candidate = words.slice(start, start + windowSize).join(" ");
+        if (KEYWORD_MAP.has(candidate)) {
+          const entry = KEYWORD_MAP.get(candidate);
+          return { matchedKeyword: candidate, life: entry.life, defaultStorage: entry.defaultStorage };
+        }
+      }
+    }
+    return null;
+  }
+
+  function daysFor(match, storage) {
+    if (!match) return null;
+    return match.life[storage] ?? match.life[match.defaultStorage] ?? Object.values(match.life)[0] ?? null;
+  }
+
+  global.ShelfLifeDB = { lookup, daysFor, STORAGE_OPTIONS };
+})(window);
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  /** @typedef {{id:string,name:string,qty:string,category:string,storage:string,expiry:string,addedAt:string}} Item */
+
+  /** @type {Item[]} */
+  let items = [];
+  let state = {
+    search: "",
+    category: "",
+    urgency: "" // '', 'expired', 'today', 'soon', 'fresh'
+  };
+
+  // ---------- Firebase (cloud sync) ----------
+
+  const syncStatusEl = document.getElementById("syncStatus");
+  let itemsCol = null;
+
+  function setSyncStatus(status, text) {
+    syncStatusEl.className = "sync-status " + status;
+    syncStatusEl.textContent = text;
+  }
+
+  function initFirebase() {
+    if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey === "REPLACE_ME") {
+      setSyncStatus("error", "⚠️ Not connected — add your Firebase config");
+      return;
+    }
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      const db = firebase.firestore();
+      try {
+        db.enablePersistence({ synchronizeTabs: true }).catch(() => { /* unsupported browser/mode — fine, just no offline cache */ });
+      } catch (e) { /* ignore */ }
+
+      itemsCol = db.collection("groceryItems");
+      itemsCol.onSnapshot(
+        snapshot => {
+          items = snapshot.docs.map(d => d.data());
+          setSyncStatus("synced", "✅ Synced");
+          render();
+        },
+        err => {
+          console.error("Firestore sync error", err);
+          setSyncStatus("error", "⚠️ Sync error — see console");
+        }
+      );
+    } catch (e) {
+      console.error("Failed to init Firebase", e);
+      setSyncStatus("error", "⚠️ Couldn't connect");
+    }
+  }
+
+  function upsertItem(item) {
+    if (!itemsCol) return Promise.reject(new Error("not connected"));
+    return itemsCol.doc(item.id).set(item);
+  }
+
+  function deleteItemDoc(id) {
+    if (!itemsCol) return Promise.reject(new Error("not connected"));
+    return itemsCol.doc(id).delete();
+  }
+
+  // ---------- date / urgency helpers ----------
+
+  function startOfToday() {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function parseDateLocal(dateStr) {
+    // dateStr is "YYYY-MM-DD" from <input type=date>; parse as local midnight, not UTC.
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function daysUntil(dateStr) {
+    const target = parseDateLocal(dateStr);
+    const today = startOfToday();
+    return Math.round((target - today) / 86400000);
+  }
+
+  function urgencyOf(dateStr) {
+    const diff = daysUntil(dateStr);
+    if (diff < 0) return "expired";
+    if (diff === 0) return "today";
+    if (diff <= 3) return "soon";
+    return "fresh";
+  }
+
+  function expiryNote(dateStr) {
+    const diff = daysUntil(dateStr);
+    if (diff < 0) return `Expired ${Math.abs(diff)}d ago`;
+    if (diff === 0) return "Expires today";
+    if (diff === 1) return "Expires tomorrow";
+    return `Expires in ${diff}d`;
+  }
+
+  function formatDate(dateStr) {
+    const d = parseDateLocal(dateStr);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function toDateStr(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function addDays(days) {
+    const d = startOfToday();
+    d.setDate(d.getDate() + days);
+    return toDateStr(d);
+  }
+
+  function storageLabel(storageValue) {
+    const opt = (ShelfLifeDB.STORAGE_OPTIONS || []).find(o => o.value === storageValue);
+    return opt ? `${opt.icon} ${opt.label}` : storageValue;
+  }
+
+  const GROUP_DEFS = [
+    { key: "expired", title: "Expired — eat, toss, or reconsider" },
+    { key: "today", title: "Eat Today" },
+    { key: "soon", title: "Eat Soon (within 3 days)" },
+    { key: "fresh", title: "Fresh" }
+  ];
+
+  // ---------- DOM refs ----------
+
+  const addForm = document.getElementById("addForm");
+  const itemNameInput = document.getElementById("itemName");
+  const itemQtyInput = document.getElementById("itemQty");
+  const itemCategoryInput = document.getElementById("itemCategory");
+  const itemStorageInput = document.getElementById("itemStorage");
+  const itemExpiryInput = document.getElementById("itemExpiry");
+  const expiryHintEl = document.getElementById("expiryHint");
+
+  const CATEGORIES = ["Produce", "Dairy", "Meat & Seafood", "Bakery", "Frozen", "Pantry", "Beverages", "Leftovers", "Other"];
+  const DEFAULT_STORAGE = "fridge";
+
+  const searchBox = document.getElementById("searchBox");
+  const categoryFilter = document.getElementById("categoryFilter");
+  const clearFiltersBtn = document.getElementById("clearFilters");
+
+  const groupsContainer = document.getElementById("groupsContainer");
+  const emptyState = document.getElementById("emptyState");
+  const summaryBar = document.getElementById("summaryBar");
+
+  const toastEl = document.getElementById("toast");
+  const toastMessageEl = document.getElementById("toastMessage");
+  const toastActionBtn = document.getElementById("toastActionBtn");
+  let toastTimer = null;
+
+  // ---------- rendering ----------
+
+  function render() {
+    renderCategoryOptions();
+    renderSummary();
+    renderList();
+  }
+
+  function renderCategoryOptions() {
+    const cats = Array.from(new Set(items.map(i => i.category))).sort();
+    const current = categoryFilter.value;
+    categoryFilter.innerHTML = '<option value="">All categories</option>' +
+      cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    if (cats.includes(current)) categoryFilter.value = current;
+  }
+
+  function renderSummary() {
+    const counts = { expired: 0, today: 0, soon: 0, fresh: 0 };
+    items.forEach(i => { counts[urgencyOf(i.expiry)]++; });
+
+    document.getElementById("countExpired").textContent = counts.expired;
+    document.getElementById("countToday").textContent = counts.today;
+    document.getElementById("countSoon").textContent = counts.soon;
+    document.getElementById("countFresh").textContent = counts.fresh;
+
+    summaryBar.querySelectorAll(".summary-pill").forEach(pill => {
+      pill.classList.toggle("active", pill.dataset.filter === state.urgency);
+    });
+  }
+
+  function getFilteredItems() {
+    const search = state.search.trim().toLowerCase();
+    return items.filter(i => {
+      if (state.urgency && urgencyOf(i.expiry) !== state.urgency) return false;
+      if (state.category && i.category !== state.category) return false;
+      if (search && !i.name.toLowerCase().includes(search)) return false;
+      return true;
+    });
+  }
+
+  function renderList() {
+    const filtered = getFilteredItems();
+    groupsContainer.innerHTML = "";
+
+    if (items.length === 0) {
+      emptyState.hidden = false;
+      emptyState.textContent = "No groceries yet. Add something above to get started.";
+      return;
+    }
+    if (filtered.length === 0) {
+      emptyState.hidden = false;
+      emptyState.textContent = "No items match your search/filters.";
+      return;
+    }
+    emptyState.hidden = true;
+
+    GROUP_DEFS.forEach(def => {
+      const groupItems = filtered
+        .filter(i => urgencyOf(i.expiry) === def.key)
+        .sort((a, b) => a.expiry.localeCompare(b.expiry) || a.name.localeCompare(b.name));
+
+      if (groupItems.length === 0) return;
+
+      const groupEl = document.createElement("div");
+      groupEl.className = `group ${def.key}`;
+
+      const titleEl = document.createElement("h2");
+      titleEl.className = "group-title";
+      titleEl.innerHTML = `<span class="dot"></span>${escapeHtml(def.title)} (${groupItems.length})`;
+      groupEl.appendChild(titleEl);
+
+      groupItems.forEach(item => groupEl.appendChild(renderItemCard(item, def.key)));
+      groupsContainer.appendChild(groupEl);
+    });
+  }
+
+  function renderItemCard(item, urgencyKey) {
+    const card = document.createElement("div");
+    card.className = `item-card ${urgencyKey}`;
+    card.dataset.id = item.id;
+
+    card.innerHTML = `
+      <div class="item-main">
+        <div class="item-name">${escapeHtml(item.name)}</div>
+        <div class="item-meta">
+          <span class="badge">${escapeHtml(item.category)}</span>
+          ${item.storage ? `<span class="badge">${escapeHtml(storageLabel(item.storage))}</span>` : ""}
+          ${item.qty ? `<span class="badge">${escapeHtml(item.qty)}</span>` : ""}
+          <span>${formatDate(item.expiry)}</span>
+        </div>
+      </div>
+      <div class="item-expiry-note">${escapeHtml(expiryNote(item.expiry))}</div>
+      <div class="item-actions">
+        <button class="icon-btn eat-btn" title="Mark as eaten">✓ Eaten</button>
+        <button class="icon-btn edit-btn" title="Edit item">✎</button>
+        <button class="icon-btn danger remove-btn" title="Remove item">✖</button>
+      </div>
+    `;
+
+    card.querySelector(".eat-btn").addEventListener("click", () => removeItem(item.id, "eaten"));
+    card.querySelector(".remove-btn").addEventListener("click", () => removeItem(item.id, "removed"));
+    card.querySelector(".edit-btn").addEventListener("click", () => startEdit(card, item));
+
+    return card;
+  }
+
+  function startEdit(card, item) {
+    card.innerHTML = `
+      <div class="item-main edit-mode" style="display:flex; gap:8px; flex-wrap:wrap; flex:1;">
+        <input type="text" class="edit-name" value="${escapeHtml(item.name)}" style="flex:2; min-width:120px;">
+        <input type="text" class="edit-qty" value="${escapeHtml(item.qty)}" placeholder="Qty" style="flex:1; min-width:70px;">
+        <select class="edit-category" style="flex:1; min-width:110px;"></select>
+        <select class="edit-storage" style="flex:1; min-width:110px;"></select>
+        <input type="date" class="edit-expiry" value="${item.expiry}" style="flex:1; min-width:130px;">
+        <button type="button" class="icon-btn edit-suggest-btn" title="Suggest date from typical shelf life">🔮</button>
+      </div>
+      <div class="item-actions">
+        <button class="icon-btn save-btn" title="Save">Save</button>
+        <button class="icon-btn cancel-btn" title="Cancel">Cancel</button>
+      </div>
+    `;
+
+    const categorySelect = card.querySelector(".edit-category");
+    categorySelect.innerHTML = CATEGORIES.map(c =>
+      `<option value="${escapeHtml(c)}" ${c === item.category ? "selected" : ""}>${escapeHtml(c)}</option>`
+    ).join("");
+
+    const storageSelect = card.querySelector(".edit-storage");
+    storageSelect.innerHTML = ShelfLifeDB.STORAGE_OPTIONS.map(o =>
+      `<option value="${o.value}" ${o.value === (item.storage || DEFAULT_STORAGE) ? "selected" : ""}>${o.icon} ${o.label}</option>`
+    ).join("");
+
+    card.querySelector(".edit-suggest-btn").addEventListener("click", () => {
+      const nameVal = card.querySelector(".edit-name").value;
+      const match = ShelfLifeDB.lookup(nameVal);
+      if (!match) {
+        showToast(`No shelf-life estimate for "${nameVal}".`);
+        return;
+      }
+      storageSelect.value = match.defaultStorage;
+      const days = ShelfLifeDB.daysFor(match, storageSelect.value);
+      card.querySelector(".edit-expiry").value = addDays(days);
+      showToast(`Estimated ${days}-day ${storageLabel(storageSelect.value)} shelf life applied.`);
+    });
+
+    card.querySelector(".save-btn").addEventListener("click", () => {
+      const name = card.querySelector(".edit-name").value.trim();
+      const expiry = card.querySelector(".edit-expiry").value;
+      if (!name || !expiry) {
+        showToast("Name and expiration date are required.");
+        return;
+      }
+      const updated = {
+        ...item,
+        name,
+        qty: card.querySelector(".edit-qty").value.trim(),
+        category: categorySelect.value,
+        storage: storageSelect.value,
+        expiry
+      };
+      upsertItem(updated).catch(() => showToast("Couldn't save — check your connection."));
+      showToast(`Updated ${name}.`);
+    });
+
+    card.querySelector(".cancel-btn").addEventListener("click", render);
+  }
+
+  function removeItem(id, reason) {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    deleteItemDoc(id).catch(() => showToast("Couldn't remove — check your connection."));
+
+    if (reason === "eaten") {
+      showToast(`Nice — ${item.name} eaten in time!`, {
+        label: "Undo",
+        onClick: () => {
+          upsertItem(item).catch(() => showToast("Couldn't restore — check your connection."));
+          showToast(`Restored ${item.name}.`);
+        }
+      });
+    } else {
+      showToast(`Removed ${item.name}.`);
+    }
+  }
+
+  function showToast(msg, action) {
+    toastMessageEl.textContent = msg;
+    toastEl.hidden = false;
+
+    if (action) {
+      toastActionBtn.textContent = action.label;
+      toastActionBtn.hidden = false;
+      toastActionBtn.onclick = () => {
+        clearTimeout(toastTimer);
+        toastEl.hidden = true;
+        action.onClick();
+      };
+    } else {
+      toastActionBtn.hidden = true;
+      toastActionBtn.onclick = null;
+    }
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.hidden = true; }, action ? 6000 : 2500);
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[ch]));
+  }
+
+  function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ---------- shelf-life suggestion (add form) ----------
+
+  let dateTouchedByUser = false;
+  let storageTouchedByUser = false;
+
+  function updateShelfLifeHint() {
+    const name = itemNameInput.value.trim();
+
+    if (!name) {
+      expiryHintEl.textContent = "";
+      expiryHintEl.classList.remove("has-match");
+      return;
+    }
+
+    const match = ShelfLifeDB.lookup(name);
+
+    if (!match) {
+      expiryHintEl.textContent = `No shelf-life estimate for "${name}" — set the expiration manually.`;
+      expiryHintEl.classList.remove("has-match");
+      return;
+    }
+
+    if (!storageTouchedByUser) {
+      itemStorageInput.value = match.defaultStorage;
+    }
+
+    const days = ShelfLifeDB.daysFor(match, itemStorageInput.value);
+    const suggestedDate = addDays(days);
+    expiryHintEl.classList.add("has-match");
+
+    if (!dateTouchedByUser) {
+      itemExpiryInput.value = suggestedDate;
+      expiryHintEl.textContent = `Estimated ${days}-day ${storageLabel(itemStorageInput.value)} shelf life applied — edit the date if yours differs.`;
+    } else if (itemExpiryInput.value === suggestedDate) {
+      expiryHintEl.textContent = `Matches typical ${storageLabel(itemStorageInput.value)} shelf life (${days} days).`;
+    } else {
+      expiryHintEl.innerHTML = `Typical ${escapeHtml(storageLabel(itemStorageInput.value))} shelf life: ${days} days (~${escapeHtml(formatDate(suggestedDate))}). ` +
+        `<button type="button" class="link-btn" data-apply-date="${suggestedDate}">Use this instead</button>`;
+    }
+  }
+
+  function debounce(fn, delay) {
+    let timer = null;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  }
+
+  itemNameInput.addEventListener("input", debounce(() => {
+    if (!itemNameInput.value.trim()) {
+      dateTouchedByUser = false;
+      storageTouchedByUser = false;
+    }
+    updateShelfLifeHint();
+  }, 250));
+
+  itemExpiryInput.addEventListener("input", () => {
+    dateTouchedByUser = true;
+    updateShelfLifeHint();
+  });
+
+  itemStorageInput.addEventListener("change", () => {
+    storageTouchedByUser = true;
+    updateShelfLifeHint();
+  });
+
+  expiryHintEl.addEventListener("click", e => {
+    const btn = e.target.closest(".link-btn");
+    if (!btn) return;
+    itemExpiryInput.value = btn.dataset.applyDate;
+    dateTouchedByUser = false;
+    updateShelfLifeHint();
+  });
+
+  // ---------- events ----------
+
+  addForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = itemNameInput.value.trim();
+    const expiry = itemExpiryInput.value;
+    if (!name || !expiry) return;
+
+    const newItem = {
+      id: genId(),
+      name,
+      qty: itemQtyInput.value.trim(),
+      category: itemCategoryInput.value,
+      storage: itemStorageInput.value,
+      expiry,
+      addedAt: new Date().toISOString()
+    };
+
+    upsertItem(newItem).catch(() => showToast("Couldn't save — check your connection."));
+    showToast(`Added ${name}.`);
+
+    addForm.reset();
+    itemCategoryInput.value = "Other";
+    itemStorageInput.value = DEFAULT_STORAGE;
+    dateTouchedByUser = false;
+    storageTouchedByUser = false;
+    expiryHintEl.textContent = "";
+    expiryHintEl.classList.remove("has-match");
+    itemNameInput.focus();
+  });
+
+  searchBox.addEventListener("input", () => {
+    state.search = searchBox.value;
+    renderList();
+  });
+
+  categoryFilter.addEventListener("change", () => {
+    state.category = categoryFilter.value;
+    renderList();
+  });
+
+  summaryBar.addEventListener("click", e => {
+    const pill = e.target.closest(".summary-pill");
+    if (!pill) return;
+    const key = pill.dataset.filter;
+    state.urgency = state.urgency === key ? "" : key;
+    renderSummary();
+    renderList();
+  });
+
+  clearFiltersBtn.addEventListener("click", () => {
+    state.search = "";
+    state.category = "";
+    state.urgency = "";
+    searchBox.value = "";
+    categoryFilter.value = "";
+    renderSummary();
+    renderList();
+  });
+
+  // populate the storage dropdown and give the date field a sensible default
+  (function initAddForm() {
+    itemStorageInput.innerHTML = ShelfLifeDB.STORAGE_OPTIONS.map(o =>
+      `<option value="${o.value}">${o.icon} ${o.label}</option>`
+    ).join("");
+    itemStorageInput.value = DEFAULT_STORAGE;
+    itemExpiryInput.value = addDays(7);
+  })();
+
+  render();
+  initFirebase();
+})();
+</script>
+</body>
+</html>
