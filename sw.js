@@ -1,4 +1,4 @@
-const CACHE_NAME = "nexpire-v3";
+const CACHE_NAME = "nexpire-v4";
 const PRECACHE_URLS = ["./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", event => {

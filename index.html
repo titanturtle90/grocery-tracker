@@ -575,6 +575,16 @@ button {
 .recipe-filters input[type="text"] { flex: 1; min-width: 160px; }
 .recipe-filters select { max-width: 180px; }
 
+.spoonacular-settings {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+.spoonacular-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.spoonacular-row input[type="text"] { flex: 1; min-width: 220px; }
+
 .shopping-form {
   display: flex;
   gap: 10px;
@@ -910,6 +920,16 @@ button {
 
   <div id="recipesPanel" hidden>
     <p class="subtitle">Pick what you want to use up, and I'll find recipes built around it.</p>
+
+    <div class="spoonacular-settings">
+      <div class="spoonacular-row">
+        <input type="text" id="spoonacularKeyInput" placeholder="Optional: paste a free Spoonacular API key for thousands more recipes">
+        <button type="button" id="saveSpoonacularKey">Save</button>
+        <button type="button" id="clearSpoonacularKey" class="ghost-btn" hidden>Remove</button>
+      </div>
+      <p class="recipe-status" id="spoonacularKeyStatus">Get a free key at <a href="https://spoonacular.com/food-api" target="_blank" rel="noopener">spoonacular.com/food-api</a> — stored only in this browser, never uploaded anywhere.</p>
+    </div>
+
     <div id="recipeChecklist" class="recipe-checklist"></div>
     <div class="recipe-actions">
       <button id="findRecipesBtn" type="button">Find Recipes</button>
@@ -923,7 +943,7 @@ button {
       <input type="text" id="recipeExcludeFilter" placeholder="Exclude ingredients (comma-separated)">
     </div>
     <div id="recipeResults"></div>
-    <p class="recipe-status" style="margin-top:24px;">Recipes courtesy of <a href="https://www.themealdb.com" target="_blank" rel="noopener">TheMealDB</a>.</p>
+    <p class="recipe-status" style="margin-top:24px;">Recipes courtesy of <a href="https://www.themealdb.com" target="_blank" rel="noopener">TheMealDB</a> and, when a key is added, <a href="https://spoonacular.com/food-api" target="_blank" rel="noopener">Spoonacular</a>.</p>
   </div>
 
   <div id="bogoPanel" hidden>
@@ -2144,15 +2164,64 @@ if ("serviceWorker" in navigator) {
   const cuisineFilterSelect = document.getElementById("recipeCuisineFilter");
   const excludeFilterInput = document.getElementById("recipeExcludeFilter");
 
+  const spoonacularKeyInput = document.getElementById("spoonacularKeyInput");
+  const saveSpoonacularKeyBtn = document.getElementById("saveSpoonacularKey");
+  const clearSpoonacularKeyBtn = document.getElementById("clearSpoonacularKey");
+  const spoonacularKeyStatus = document.getElementById("spoonacularKeyStatus");
+
   const MEALDB_BASE = "https://www.themealdb.com/api/json/v1/1/";
   const INGREDIENT_CACHE_KEY = "grocery-tracker-mealdb-ingredients-v1";
   const AREA_CACHE_KEY = "grocery-tracker-mealdb-areas-v1";
   const LIST_CACHE_DAYS = 30;
 
+  const SPOONACULAR_BASE = "https://api.spoonacular.com/";
+  const SPOONACULAR_KEY_STORAGE = "nexpire-spoonacular-key";
+
   let canonicalIngredients = null;
   const recipeDetailCache = new Map();
   let checklistPopulated = false;
   let cuisineListLoaded = false;
+
+  // ---------- spoonacular key settings ----------
+
+  function getSpoonacularKey() {
+    try {
+      return (localStorage.getItem(SPOONACULAR_KEY_STORAGE) || "").trim();
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function refreshSpoonacularUI() {
+    const key = getSpoonacularKey();
+    if (key) {
+      spoonacularKeyInput.value = key;
+      spoonacularKeyStatus.textContent = "✓ Spoonacular connected — you'll get real recipes from both TheMealDB and Spoonacular.";
+      clearSpoonacularKeyBtn.hidden = false;
+    } else {
+      spoonacularKeyInput.value = "";
+      spoonacularKeyStatus.innerHTML = 'Get a free key at <a href="https://spoonacular.com/food-api" target="_blank" rel="noopener">spoonacular.com/food-api</a> — stored only in this browser, never uploaded anywhere.';
+      clearSpoonacularKeyBtn.hidden = true;
+    }
+  }
+
+  saveSpoonacularKeyBtn.addEventListener("click", () => {
+    const value = spoonacularKeyInput.value.trim();
+    if (!value) return;
+    try {
+      localStorage.setItem(SPOONACULAR_KEY_STORAGE, value);
+    } catch (e) { /* storage unavailable */ }
+    refreshSpoonacularUI();
+  });
+
+  clearSpoonacularKeyBtn.addEventListener("click", () => {
+    try {
+      localStorage.removeItem(SPOONACULAR_KEY_STORAGE);
+    } catch (e) { /* storage unavailable */ }
+    refreshSpoonacularUI();
+  });
+
+  refreshSpoonacularUI();
 
   // ---------- tab switching ----------
 
@@ -2267,16 +2336,180 @@ if ("serviceWorker" in navigator) {
     }).join("");
   }
 
+  /*
+   * TheMealDB is thin (or empty) on common Tex-Mex/American staples like
+   * tacos and burritos — its per-ingredient filter simply has no beef+
+   * tortilla recipes tagged, even though every home cook knows that combo.
+   * This curated list fills that gap with hand-authored quick recipes for
+   * everyday combos, shown alongside whatever TheMealDB actually returns.
+   */
+  function kwRegexes(keywords) {
+    return keywords.map(kw => new RegExp("\\b" + escapeRegExp(kw) + "s?\\b", "i"));
+  }
+
+  const STAPLE_RECIPES = [
+    { name: "Ground Beef Tacos", required: [["ground beef", "beef", "ground turkey"], ["tortilla", "taco shell"]],
+      ingredients: ["1 lb ground beef", "1 packet (or 2 tbsp) taco seasoning", "Tortillas or taco shells", "Shredded cheese, lettuce, salsa, sour cream (optional)"],
+      steps: ["Brown the ground beef in a skillet over medium-high heat, breaking it up as it cooks.", "Drain excess fat, stir in taco seasoning and a splash of water, and simmer 3-5 minutes.", "Warm the tortillas or taco shells.", "Fill with the beef and your favorite toppings."] },
+    { name: "Beef Burritos", required: [["ground beef", "beef", "ground turkey"], ["tortilla"]],
+      ingredients: ["1 lb ground beef", "Taco or burrito seasoning", "Large flour tortillas", "Rice, beans, cheese, salsa (optional)"],
+      steps: ["Brown the ground beef and season it (taco seasoning works great).", "Warm the tortillas so they roll without cracking.", "Layer beef with rice, beans, and toppings down the center.", "Fold in the sides and roll tightly."] },
+    { name: "Beef Quesadillas", required: [["ground beef", "beef", "chicken"], ["tortilla"], ["cheese", "cheddar", "mozzarella"]],
+      ingredients: ["Cooked ground beef or shredded chicken", "Tortillas", "Shredded cheese"],
+      steps: ["Scatter cooked meat and cheese over half a tortilla, then fold it over.", "Cook in a dry skillet over medium heat, 2-3 minutes per side, until golden and the cheese melts.", "Slice into wedges and serve with salsa or sour cream."] },
+    { name: "Nachos", required: [["tortilla chip", "chip"], ["cheese", "cheddar", "mozzarella"]],
+      ingredients: ["Tortilla chips", "Shredded cheese", "Cooked ground beef, jalapeños, salsa (optional)"],
+      steps: ["Spread chips on a baking sheet and top with cheese (and beef if using).", "Bake at 400°F (200°C) for 5-8 minutes until the cheese melts.", "Top with salsa, sour cream, or jalapeños."] },
+    { name: "Chicken Fajitas", required: [["chicken"], ["pepper", "bell pepper", "onion"], ["tortilla"]],
+      ingredients: ["Sliced chicken breast", "Sliced bell peppers and onion", "Fajita seasoning", "Tortillas"],
+      steps: ["Season the chicken and slice into strips.", "Sauté chicken, peppers, and onion in a hot skillet until the chicken is cooked through.", "Serve in warm tortillas with your favorite toppings."] },
+    { name: "Sloppy Joes", required: [["ground beef", "ground turkey"], ["bun", "bread", "roll"]],
+      ingredients: ["1 lb ground beef", "Ketchup, Worcestershire, and a little brown sugar (or sloppy joe sauce)", "Onion (optional)", "Buns"],
+      steps: ["Brown the ground beef with diced onion, then drain excess fat.", "Stir in ketchup, a splash of Worcestershire, and a pinch of brown sugar; simmer 5-10 minutes.", "Spoon onto buns and serve."] },
+    { name: "Homemade Burgers", required: [["ground beef", "beef"], ["bun", "bread"]],
+      ingredients: ["1 lb ground beef", "Salt and pepper", "Buns", "Cheese, lettuce, tomato (optional)"],
+      steps: ["Form the beef into patties and season with salt and pepper.", "Grill or pan-sear 3-4 minutes per side to desired doneness.", "Assemble on buns with your favorite toppings."] },
+    { name: "Beef and Pasta Skillet", required: [["ground beef", "beef", "ground turkey"], ["pasta", "penne", "spaghetti"]],
+      ingredients: ["1 lb ground beef", "Pasta", "Marinara or tomato sauce", "Shredded cheese (optional)"],
+      steps: ["Brown the ground beef and drain excess fat.", "Cook pasta according to package directions.", "Stir the beef into tomato sauce and simmer a few minutes, then toss with the pasta.", "Top with cheese if desired."] },
+    { name: "Chicken and Rice Bowls", required: [["chicken"], ["rice"]],
+      ingredients: ["Chicken breast or thighs", "Rice", "Seasoning or sauce of choice", "Vegetables (optional)"],
+      steps: ["Season and cook the chicken through in a skillet or oven.", "Cook the rice.", "Slice the chicken and serve over rice with sauce and vegetables."] },
+    { name: "Chicken Stir-Fry", required: [["chicken"], ["broccoli", "pepper", "vegetable", "carrot"]],
+      ingredients: ["Sliced chicken breast", "Mixed vegetables (broccoli, pepper, carrot)", "Soy sauce or stir-fry sauce", "Rice (optional)"],
+      steps: ["Cook chicken in a hot, oiled pan or wok until browned.", "Add the vegetables and stir-fry until crisp-tender.", "Stir in sauce and cook 1-2 more minutes.", "Serve over rice."] },
+    { name: "Fried Rice", required: [["rice"], ["egg"]],
+      ingredients: ["Cooked rice (day-old is best)", "Eggs", "Soy sauce", "Vegetables, leftover meat (optional)"],
+      steps: ["Scramble the eggs in a hot pan or wok and set aside.", "Stir-fry the rice with a little oil, breaking up clumps.", "Add the eggs back in with soy sauce and any extras, and toss to combine."] },
+    { name: "Grilled Cheese Sandwiches", required: [["bread"], ["cheese", "cheddar", "mozzarella"]],
+      ingredients: ["Bread", "Sliced cheese", "Butter"],
+      steps: ["Butter one side of each bread slice.", "Layer cheese between the unbuttered sides.", "Grill in a skillet over medium heat, 2-3 minutes per side, until golden and melty."] },
+    { name: "BLT Sandwich", required: [["bacon"], ["lettuce"], ["bread"]],
+      ingredients: ["Bacon", "Lettuce", "Tomato", "Bread", "Mayo (optional)"],
+      steps: ["Cook the bacon until crisp.", "Toast the bread if desired and spread with mayo.", "Layer bacon, lettuce, and tomato between the slices."] },
+    { name: "PB&J Sandwich", required: [["peanut butter"], ["bread"]],
+      ingredients: ["Bread", "Peanut butter", "Jelly or jam"],
+      steps: ["Spread peanut butter on one slice of bread and jelly on the other.", "Press the slices together and slice in half."] },
+    { name: "Chicken Noodle Soup", required: [["chicken"], ["pasta", "penne", "noodle"]],
+      ingredients: ["Cooked or raw chicken", "Egg noodles or pasta", "Chicken broth", "Carrot, celery, onion (optional)"],
+      steps: ["Simmer chicken in broth (with vegetables if using) until cooked through.", "Shred the chicken and return it to the pot.", "Add noodles and cook until tender."] },
+    { name: "Shrimp Tacos", required: [["shrimp"], ["tortilla"]],
+      ingredients: ["Shrimp", "Tortillas", "Cabbage or lettuce slaw", "Lime, salsa, or crema (optional)"],
+      steps: ["Season and sauté the shrimp until pink and just cooked through, 2-3 minutes per side.", "Warm the tortillas.", "Fill with shrimp, slaw, and a squeeze of lime."] },
+    { name: "Breakfast Burritos", required: [["egg"], ["tortilla"]],
+      ingredients: ["Eggs", "Tortillas", "Cheese, bacon, or sausage (optional)"],
+      steps: ["Scramble the eggs (and cook any bacon or sausage) in a skillet.", "Warm the tortillas.", "Fill with eggs, cheese, and extras, then roll up."] }
+  ];
+
+  function findStapleRecipes(selectedNames) {
+    const results = [];
+    for (const recipe of STAPLE_RECIPES) {
+      const matchedItems = [];
+      let allGroupsMatched = true;
+      for (const group of recipe.required) {
+        const patterns = kwRegexes(group);
+        const hit = selectedNames.find(name => patterns.some(re => re.test(name)));
+        if (!hit) { allGroupsMatched = false; break; }
+        if (!matchedItems.includes(hit)) matchedItems.push(hit);
+      }
+      if (allGroupsMatched) {
+        results.push({ source: "staple", strMeal: recipe.name, matchedItems, ingredients: recipe.ingredients, steps: recipe.steps });
+      }
+    }
+    return results;
+  }
+
+  // ---------- spoonacular (optional, user-supplied key) ----------
+
+  function capitalize(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  async function searchSpoonacular(selectedNames, excludeTerms) {
+    const key = getSpoonacularKey();
+    if (!key) return { recipes: [], error: null };
+
+    const url = SPOONACULAR_BASE + "recipes/findByIngredients?ingredients=" +
+      encodeURIComponent(selectedNames.join(",")) +
+      "&number=10&ranking=1&ignorePantry=true&apiKey=" + encodeURIComponent(key);
+
+    try {
+      const res = await fetch(url);
+      if (res.status === 401) return { recipes: [], error: "Spoonacular key looks invalid — check it above." };
+      if (res.status === 402) return { recipes: [], error: "Spoonacular's free daily quota is used up — more recipes tomorrow." };
+      if (!res.ok) return { recipes: [], error: "Spoonacular request failed." };
+      const data = await res.json();
+
+      let recipes = (Array.isArray(data) ? data : []).map(r => {
+        const used = r.usedIngredients || [];
+        const missed = r.missedIngredients || [];
+        return {
+          source: "spoonacular",
+          idMeal: r.id,
+          strMeal: r.title,
+          strMealThumb: r.image,
+          matchedItems: used.length ? used.map(i => capitalize(i.name)) : selectedNames,
+          ingredientText: [...used, ...missed].map(i => i.name).join(" ").toLowerCase()
+        };
+      });
+
+      if (excludeTerms && excludeTerms.length > 0) {
+        recipes = recipes.filter(r => !excludeTerms.some(term => r.ingredientText.includes(term)));
+      }
+
+      return { recipes, error: null };
+    } catch (e) {
+      return { recipes: [], error: "Couldn't reach Spoonacular — check your connection." };
+    }
+  }
+
+  async function getSpoonacularDetail(id) {
+    const cacheKey = "sp-" + id;
+    if (recipeDetailCache.has(cacheKey)) return recipeDetailCache.get(cacheKey);
+    const key = getSpoonacularKey();
+    const url = SPOONACULAR_BASE + "recipes/" + encodeURIComponent(id) + "/information?apiKey=" + encodeURIComponent(key);
+    const res = await fetch(url);
+    const meal = res.ok ? await res.json() : null;
+    recipeDetailCache.set(cacheKey, meal);
+    return meal;
+  }
+
   // ---------- search ----------
 
   async function searchRecipes(selectedNames, cuisine, excludeTerms) {
+    const staples = cuisine ? [] : findStapleRecipes(selectedNames);
+    if (excludeTerms && excludeTerms.length > 0) {
+      for (let i = staples.length - 1; i >= 0; i--) {
+        const text = staples[i].ingredients.join(" ").toLowerCase();
+        if (excludeTerms.some(term => text.includes(term))) staples.splice(i, 1);
+      }
+    }
+
+    const spoonacularPromise = cuisine
+      ? Promise.resolve({ recipes: [], error: null })
+      : searchSpoonacular(selectedNames, excludeTerms);
+
     const canonicalList = await getCanonicalIngredients();
     const mapped = selectedNames
       .map(name => ({ name, canonical: findCanonicalIngredient(name, canonicalList) }))
       .filter(m => m.canonical);
-    const unmatched = selectedNames.filter(name => !mapped.some(m => m.name === name));
 
-    if (mapped.length === 0) return { recipes: [], unmatched: selectedNames };
+    const spoonacular = await spoonacularPromise;
+    const spoonacularMatchedNames = new Set();
+    spoonacular.recipes.forEach(r => {
+      selectedNames.forEach(name => {
+        if (r.ingredientText.includes(name.toLowerCase())) spoonacularMatchedNames.add(name);
+      });
+      delete r.ingredientText;
+    });
+
+    const stapleMatchedNames = new Set(staples.flatMap(s => s.matchedItems));
+    const unmatched = selectedNames.filter(name =>
+      !mapped.some(m => m.name === name) && !stapleMatchedNames.has(name) && !spoonacularMatchedNames.has(name));
+
+    if (mapped.length === 0) {
+      return { recipes: [...staples, ...spoonacular.recipes], unmatched, spoonacularError: spoonacular.error };
+    }
 
     const perIngredient = await Promise.all(mapped.map(async m => {
       const url = MEALDB_BASE + "filter.php?i=" + encodeURIComponent(m.canonical.replace(/\s+/g, "_"));
@@ -2328,7 +2561,7 @@ if ("serviceWorker" in navigator) {
       });
     }
 
-    return { recipes, unmatched };
+    return { recipes: [...staples, ...spoonacular.recipes, ...recipes], unmatched, spoonacularError: spoonacular.error };
   }
 
   async function getRecipeDetail(idMeal) {
@@ -2375,12 +2608,18 @@ if ("serviceWorker" in navigator) {
     grid.className = "recipe-grid";
 
     recipes.forEach(recipe => {
+      const isStaple = recipe.source === "staple";
+      const isSpoonacular = recipe.source === "spoonacular";
       const card = document.createElement("div");
       card.className = "recipe-card";
       card.innerHTML = `
-        <img src="${escapeHtml(recipe.strMealThumb)}" alt="${escapeHtml(recipe.strMeal)}" loading="lazy">
+        ${isStaple
+          ? `<div class="recipe-card-placeholder" aria-hidden="true">🍽️</div>`
+          : `<img src="${escapeHtml(recipe.strMealThumb)}" alt="${escapeHtml(recipe.strMeal)}" loading="lazy">`}
         <div class="recipe-card-body">
           <div class="recipe-card-title">${escapeHtml(recipe.strMeal)}</div>
+          ${isStaple ? `<div class="recipe-card-badge">Quick recipe</div>` : ``}
+          ${isSpoonacular ? `<div class="recipe-card-badge">Spoonacular</div>` : ``}
           <div class="recipe-card-match">Uses: ${recipe.matchedItems.map(escapeHtml).join(", ")}</div>
           <button type="button" class="recipe-card-toggle">View recipe</button>
           <div class="recipe-detail" hidden></div>
@@ -2396,8 +2635,45 @@ if ("serviceWorker" in navigator) {
           toggleBtn.textContent = "View recipe";
           return;
         }
+
+        if (isStaple) {
+          detailEl.innerHTML = `
+            <h4>Ingredients</h4>
+            <ul>${recipe.ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+            <h4>Instructions</h4>
+            <ul>${recipe.steps.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ul>
+          `;
+          detailEl.hidden = false;
+          toggleBtn.textContent = "Hide recipe";
+          return;
+        }
+
         toggleBtn.textContent = "Loading…";
         toggleBtn.disabled = true;
+
+        if (isSpoonacular) {
+          const meal = await getSpoonacularDetail(recipe.idMeal);
+          toggleBtn.disabled = false;
+          if (!meal) {
+            detailEl.innerHTML = "<p>Couldn't load this recipe.</p>";
+          } else {
+            const ingredients = (meal.extendedIngredients || []).map(i => i.original || i.name);
+            const steps = (meal.analyzedInstructions || [])[0];
+            const stepsHtml = steps && steps.steps && steps.steps.length
+              ? `<ul>${steps.steps.map(s => `<li>${escapeHtml(s.step)}</li>`).join("")}</ul>`
+              : `<div>${escapeHtml((meal.instructions || "").replace(/<[^>]*>/g, "")).replace(/\n+/g, "<br><br>")}</div>`;
+            detailEl.innerHTML = `
+              <h4>Ingredients</h4>
+              <ul>${ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+              <h4>Instructions</h4>
+              ${stepsHtml}
+            `;
+          }
+          detailEl.hidden = false;
+          toggleBtn.textContent = "Hide recipe";
+          return;
+        }
+
         const meal = await getRecipeDetail(recipe.idMeal);
         toggleBtn.disabled = false;
         if (!meal) {
@@ -2439,9 +2715,10 @@ if ("serviceWorker" in navigator) {
     nameFilterInput.value = "";
 
     try {
-      const { recipes, unmatched } = await searchRecipes(selected, cuisine, excludeTerms);
+      const { recipes, unmatched, spoonacularError } = await searchRecipes(selected, cuisine, excludeTerms);
       renderRecipes(resultsEl, recipes, unmatched);
-      statusEl.textContent = recipes.length ? `Found ${recipes.length} recipe${recipes.length === 1 ? "" : "s"}.` : "";
+      const foundText = recipes.length ? `Found ${recipes.length} recipe${recipes.length === 1 ? "" : "s"}.` : "";
+      statusEl.textContent = spoonacularError ? `${foundText} ${spoonacularError}`.trim() : foundText;
     } catch (e) {
       console.error("Recipe search failed", e);
       statusEl.textContent = "Recipe search unavailable — check your connection.";
