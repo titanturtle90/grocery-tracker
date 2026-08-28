@@ -1,6 +1,6 @@
 {
-  "name": "Nexpire",
-  "short_name": "Nexpire",
+  "name": "Grocery Glance",
+  "short_name": "Grocery Glance",
   "description": "Track groceries and what to eat first, before it expires.",
   "start_url": "./index.html",
   "scope": "./",

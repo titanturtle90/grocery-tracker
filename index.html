@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nexpire</title>
+<title>Grocery Glance</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#16a34a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Nexpire">
+<meta name="apple-mobile-web-app-title" content="Grocery Glance">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -787,9 +787,9 @@ button {
 
   <header class="app-header">
     <div class="brand">
-      <img class="brand-mark" src="icon-192.png" alt="Nexpire">
+      <img class="brand-mark" src="icon-192.png" alt="Grocery Glance">
       <div>
-        <h1>Nexpire</h1>
+        <h1>Grocery Glance</h1>
         <p class="subtitle">Track what you have. Eat it before it's gone.</p>
       </div>
     </div>
@@ -1533,7 +1533,7 @@ const FIREBASE_CONFIG = {
     const body = `${names}${extra} — expired or due today.`;
 
     navigator.serviceWorker.ready.then(reg => {
-      reg.showNotification("Nexpire", {
+      reg.showNotification("Grocery Glance", {
         body,
         icon: "icon-192.png",
         badge: "icon-192.png",
@@ -2398,7 +2398,82 @@ if ("serviceWorker" in navigator) {
       steps: ["Season and sauté the shrimp until pink and just cooked through, 2-3 minutes per side.", "Warm the tortillas.", "Fill with shrimp, slaw, and a squeeze of lime."] },
     { name: "Breakfast Burritos", required: [["egg"], ["tortilla"]],
       ingredients: ["Eggs", "Tortillas", "Cheese, bacon, or sausage (optional)"],
-      steps: ["Scramble the eggs (and cook any bacon or sausage) in a skillet.", "Warm the tortillas.", "Fill with eggs, cheese, and extras, then roll up."] }
+      steps: ["Scramble the eggs (and cook any bacon or sausage) in a skillet.", "Warm the tortillas.", "Fill with eggs, cheese, and extras, then roll up."] },
+    { name: "Shepherd's Pie", required: [["ground beef", "beef", "ground turkey"], ["potato"]],
+      ingredients: ["1 lb ground beef", "Diced onion, carrot, and peas (optional)", "2 tbsp tomato paste or ketchup", "2-3 cups mashed potatoes"],
+      steps: ["Brown the ground beef with onion (and carrot, if using); drain excess fat.", "Stir in tomato paste and a splash of broth, then simmer a few minutes until slightly thickened.", "Spread the meat mixture in a baking dish and top evenly with mashed potatoes.", "Bake at 400°F (200°C) for about 20 minutes, until lightly golden on top."] },
+    { name: "Tuna Noodle Casserole", required: [["tuna"], ["pasta", "penne", "noodle"]],
+      ingredients: ["Canned tuna, drained", "Egg noodles or pasta", "1 can cream of mushroom soup (or a simple white sauce)", "Milk", "Shredded cheese and peas (optional)"],
+      steps: ["Cook the noodles according to package directions and drain.", "Stir together the soup, a splash of milk, tuna, and peas if using.", "Fold in the cooked noodles, pour into a baking dish, and top with cheese.", "Bake at 375°F (190°C) for about 20 minutes until bubbly and golden."] },
+    { name: "Garlic Shrimp Scampi Pasta", required: [["shrimp"], ["pasta", "penne", "spaghetti"]],
+      ingredients: ["Shrimp, peeled and deveined", "Pasta (spaghetti or linguine)", "Butter and olive oil", "Garlic, minced", "Lemon juice and parsley (optional)"],
+      steps: ["Cook the pasta according to package directions, reserving a splash of pasta water.", "Sauté the shrimp in butter and olive oil until just pink, 2-3 minutes per side; set aside.", "Add garlic to the pan and cook briefly until fragrant, then stir in lemon juice and a splash of pasta water.", "Toss the pasta and shrimp in the garlic sauce and finish with parsley."] },
+    { name: "Overnight Oats", required: [["oat", "oats"], ["yogurt", "greek yogurt", "milk"]],
+      ingredients: ["1/2 cup rolled oats", "1/2 cup milk", "1/4 cup yogurt (Greek yogurt works great)", "Honey, fruit, or nut butter (optional)"],
+      steps: ["Combine the oats, milk, and yogurt in a jar or container.", "Stir in any sweetener or mix-ins you like.", "Cover and refrigerate overnight, or at least 4 hours.", "Stir and top with fresh fruit before eating."] },
+    { name: "Banana Bread", required: [["banana"], ["flour"]],
+      ingredients: ["2-3 very ripe bananas, mashed", "1/3 cup melted butter", "1 egg", "3/4 cup sugar", "1 1/2 cups flour, 1 tsp baking soda, pinch of salt"],
+      steps: ["Preheat the oven to 350°F (175°C) and grease a loaf pan.", "Mash the bananas, then stir in the melted butter, egg, and sugar.", "Sprinkle in the baking soda and salt, then fold in the flour just until combined.", "Pour into the pan and bake 45-55 minutes, until a toothpick comes out clean."] },
+    { name: "Beef and Bean Chili", required: [["ground beef", "beef", "ground turkey"], ["bean", "kidney bean", "black bean"]],
+      ingredients: ["1 lb ground beef (or turkey)", "1 can beans, drained", "1 can diced tomatoes", "Onion and garlic", "Chili powder, cumin, salt"],
+      steps: ["Brown the ground beef with diced onion and garlic; drain excess fat.", "Stir in chili powder and cumin and cook 1 minute until fragrant.", "Add the beans and diced tomatoes, then bring to a simmer.", "Simmer uncovered 20-30 minutes, stirring occasionally, until thickened."] },
+    { name: "Homemade Mac and Cheese", required: [["pasta", "penne", "macaroni"], ["cheese", "cheddar"]],
+      ingredients: ["Elbow macaroni or pasta", "2 tbsp butter", "2 tbsp flour", "1 1/2 cups milk", "1 1/2 cups shredded cheddar cheese"],
+      steps: ["Cook the pasta according to package directions and drain.", "Melt the butter in a saucepan, whisk in the flour, and cook 1 minute.", "Whisk in the milk and cook until thickened, then stir in the cheese until melted.", "Toss the sauce with the cooked pasta."] },
+    { name: "Pesto Pasta", required: [["pasta", "penne", "spaghetti"], ["pesto"]],
+      ingredients: ["Pasta", "Pesto sauce", "Parmesan cheese (optional)", "Cherry tomatoes (optional)"],
+      steps: ["Cook the pasta according to package directions, reserving a splash of pasta water.", "Toss the hot pasta with pesto, loosening with a little pasta water.", "Top with parmesan and halved cherry tomatoes if using."] },
+    { name: "Pasta Marinara", required: [["pasta", "penne", "spaghetti"], ["marinara", "tomato sauce"]],
+      ingredients: ["Pasta", "Marinara or tomato sauce", "Garlic (optional)", "Parmesan and basil (optional)"],
+      steps: ["Cook the pasta according to package directions.", "Warm the marinara sauce in a pan, adding garlic if you like.", "Toss the pasta with the sauce and top with parmesan and basil."] },
+    { name: "Chicken Caesar Salad", required: [["chicken"], ["lettuce", "romaine"]],
+      ingredients: ["Cooked chicken breast, sliced", "Romaine lettuce, chopped", "Parmesan cheese", "Caesar dressing", "Croutons (optional)"],
+      steps: ["Chop the lettuce and place in a large bowl.", "Toss with caesar dressing and parmesan.", "Top with sliced chicken and croutons."] },
+    { name: "Chicken Caesar Wrap", required: [["chicken"], ["tortilla"], ["lettuce", "romaine"]],
+      ingredients: ["Cooked chicken, sliced", "Romaine lettuce", "Parmesan cheese", "Caesar dressing", "Large tortillas"],
+      steps: ["Toss the lettuce with caesar dressing and parmesan.", "Lay the mixture and chicken down the center of a tortilla.", "Fold in the sides and roll tightly, then slice in half."] },
+    { name: "Greek Salad", required: [["cucumber"], ["tomato"], ["feta"]],
+      ingredients: ["Cucumber, chopped", "Tomato, chopped", "Feta cheese", "Red onion and olives (optional)", "Olive oil and lemon juice"],
+      steps: ["Chop the cucumber and tomato and combine in a bowl.", "Add feta, and onion or olives if using.", "Drizzle with olive oil and a squeeze of lemon juice, then toss."] },
+    { name: "Egg Salad Sandwich", required: [["egg"], ["bread"]],
+      ingredients: ["Hard-boiled eggs, chopped", "Mayo", "Mustard (optional)", "Salt and pepper", "Bread"],
+      steps: ["Boil the eggs, then peel and chop.", "Mix with mayo, a little mustard, salt, and pepper.", "Spread onto bread and serve."] },
+    { name: "Tuna Salad Sandwich", required: [["tuna"], ["bread"]],
+      ingredients: ["Canned tuna, drained", "Mayo", "Celery or onion (optional)", "Bread"],
+      steps: ["Mix the tuna with mayo, and celery or onion if using.", "Season with salt and pepper.", "Spread onto bread and serve."] },
+    { name: "Pulled Pork Sandwiches", required: [["pork"], ["bun", "bread", "roll"]],
+      ingredients: ["Pork shoulder or loin", "BBQ sauce", "Buns", "Coleslaw (optional)"],
+      steps: ["Slow-cook or braise the pork until it shreds easily with a fork.", "Shred the pork and toss with BBQ sauce.", "Pile onto buns, topped with coleslaw if you like."] },
+    { name: "Pork Chops with Apples", required: [["pork chop", "pork loin", "pork"], ["apple"]],
+      ingredients: ["Pork chops", "Apples, sliced", "Butter", "Onion (optional)", "Cinnamon or thyme"],
+      steps: ["Season the pork chops and sear in a hot skillet until browned, then set aside.", "Add butter and sliced apples (and onion, if using) to the pan and sauté until softened.", "Return the chops to the pan and cook through, spooning the apples over top."] },
+    { name: "Vegetable Stir-Fry", required: [["broccoli", "pepper", "bell pepper", "carrot", "vegetable"], ["rice"]],
+      ingredients: ["Mixed vegetables (broccoli, pepper, carrot)", "Rice", "Soy sauce", "Garlic and ginger (optional)"],
+      steps: ["Cook the rice.", "Stir-fry the vegetables in a hot, oiled pan or wok until crisp-tender.", "Add soy sauce (and garlic or ginger, if using) and toss.", "Serve over rice."] },
+    { name: "Baked Salmon with Rice", required: [["salmon"], ["rice"]],
+      ingredients: ["Salmon fillets", "Rice", "Soy sauce, or lemon and butter", "Vegetables (optional)"],
+      steps: ["Cook the rice.", "Season the salmon and bake at 400°F (200°C) for 12-15 minutes, until it flakes easily.", "Serve the salmon over rice with your sauce of choice."] },
+    { name: "Turkey Sandwich", required: [["turkey"], ["bread"]],
+      ingredients: ["Sliced turkey", "Bread", "Cheese, lettuce, tomato (optional)", "Mustard or mayo"],
+      steps: ["Spread mustard or mayo on the bread.", "Layer with turkey, cheese, lettuce, and tomato.", "Close the sandwich and slice."] },
+    { name: "Classic Omelette", required: [["egg"], ["cheese", "cheddar", "mozzarella"]],
+      ingredients: ["Eggs", "Shredded cheese", "Butter", "Vegetables or herbs (optional)"],
+      steps: ["Whisk the eggs and pour into a hot, buttered skillet.", "Let the eggs set around the edges, then add cheese (and any fillings) to one half.", "Fold the omelette in half and cook until the cheese melts."] },
+    { name: "Fluffy Pancakes", required: [["flour"], ["egg"]],
+      ingredients: ["1 1/2 cups flour", "1 egg", "1 1/4 cups milk", "2 tbsp sugar, 1 tbsp baking powder, pinch of salt", "Butter for the pan"],
+      steps: ["Whisk together the flour, sugar, baking powder, and salt.", "Add the egg and milk and stir just until combined — a few lumps are fine.", "Cook 1/4-cup scoops on a buttered griddle until bubbles form, then flip and cook the other side."] },
+    { name: "French Toast", required: [["egg"], ["bread"]],
+      ingredients: ["Bread slices", "Eggs", "Milk", "Cinnamon and vanilla (optional)", "Butter for the pan"],
+      steps: ["Whisk together eggs, milk, and cinnamon or vanilla if using.", "Dip each bread slice in the mixture, coating both sides.", "Cook in a buttered skillet over medium heat until golden on both sides."] },
+    { name: "Caprese Salad", required: [["tomato"], ["mozzarella"]],
+      ingredients: ["Tomatoes, sliced", "Fresh mozzarella, sliced", "Basil leaves", "Olive oil and balsamic (optional)"],
+      steps: ["Alternate slices of tomato and mozzarella on a plate.", "Tuck basil leaves between the slices.", "Drizzle with olive oil and balsamic if using."] },
+    { name: "Beef and Broccoli", required: [["beef", "steak"], ["broccoli"]],
+      ingredients: ["Sliced beef or steak", "Broccoli florets", "Soy sauce, garlic, and a little cornstarch", "Rice (optional)"],
+      steps: ["Sear the beef in a hot, oiled pan until browned; set aside.", "Stir-fry the broccoli until crisp-tender.", "Return the beef to the pan with soy sauce and garlic and toss until coated.", "Serve over rice."] },
+    { name: "Chicken Alfredo Pasta", required: [["chicken"], ["pasta", "penne", "fettuccine"]],
+      ingredients: ["Cooked chicken, sliced", "Pasta", "Butter and heavy cream (or alfredo sauce)", "Parmesan cheese", "Garlic (optional)"],
+      steps: ["Cook the pasta according to package directions.", "Melt butter with garlic, then stir in cream and simmer until slightly thickened.", "Stir in parmesan until the sauce is smooth.", "Toss with pasta and sliced chicken."] }
   ];
 
   function findStapleRecipes(selectedNames) {
