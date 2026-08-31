@@ -225,6 +225,20 @@ body {
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field label { font-size: 0.75rem; color: var(--text-muted); }
 
+.no-expiry-label, .opened-date-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.no-expiry-label input[type="checkbox"] { width: auto; }
+.opened-date-label { flex-direction: column; align-items: flex-start; }
+.opened-date-label input[type="date"] { width: 100%; }
+
+input:disabled { opacity: 0.5; cursor: not-allowed; }
+
 input[type="text"], input[type="date"], select {
   padding: 9px 12px;
   border: 1px solid var(--border);
@@ -311,6 +325,18 @@ button {
 .group.soon .group-title { color: var(--soon-fg); }
 .group.fresh .group-title { color: var(--fresh-fg); }
 
+.category-subgroup { margin: 0 0 16px 2px; }
+.category-subgroup:last-child { margin-bottom: 0; }
+.category-subtitle {
+  font-family: var(--font-heading);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 6px 2px;
+}
+
 .item-card {
   display: flex;
   align-items: center;
@@ -360,6 +386,8 @@ button {
   border-radius: 999px;
   padding: 1px 8px;
 }
+.item-meta .added-badge { color: var(--text-muted); }
+.item-meta .opened-badge { color: var(--accent); border-color: var(--accent); }
 
 .item-expiry-note {
   font-weight: 600;
@@ -375,6 +403,8 @@ button {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .icon-btn {
@@ -854,6 +884,7 @@ button {
       <div class="field field-date">
         <label for="itemExpiry">Expires</label>
         <input type="date" id="itemExpiry" required>
+        <label class="no-expiry-label"><input type="checkbox" id="itemNoExpiry"> Doesn't expire</label>
       </div>
       <div class="field field-submit">
         <button type="submit">Add Item</button>
@@ -1083,7 +1114,7 @@ const FIREBASE_CONFIG = {
     { keywords: ["shrimp"], life: { fridge: 2, freezer: 180 }, defaultStorage: "fridge" },
     { keywords: ["fish"], life: { fridge: 2, freezer: 180 }, defaultStorage: "fridge" },
     { keywords: ["turkey"], life: { fridge: 2, freezer: 270 }, defaultStorage: "fridge" },
-    { keywords: ["deli meat", "lunch meat", "ham"], life: { fridge: 5 }, defaultStorage: "fridge" },
+    { keywords: ["deli meat", "lunch meat", "ham"], life: { fridge: 5 }, defaultStorage: "fridge", afterOpening: 4 },
     { keywords: ["hot dog"], life: { fridge: 7, freezer: 60 }, defaultStorage: "fridge" },
     { keywords: ["tofu"], life: { fridge: 7 }, defaultStorage: "fridge" },
 
@@ -1096,9 +1127,19 @@ const FIREBASE_CONFIG = {
     { keywords: ["flour"], life: { pantry: 240 }, defaultStorage: "pantry" },
     { keywords: ["sugar"], life: { pantry: 730 }, defaultStorage: "pantry" },
     { keywords: ["cereal"], life: { pantry: 240 }, defaultStorage: "pantry" },
-    { keywords: ["canned bean", "canned soup", "canned vegetable", "canned good"], life: { pantry: 730 }, defaultStorage: "pantry" },
+    { keywords: ["bean", "canned soup", "broth", "stock"], life: { pantry: 730 }, defaultStorage: "pantry", afterOpening: 4 },
     { keywords: ["peanut butter"], life: { pantry: 270 }, defaultStorage: "pantry" },
     { keywords: ["honey"], life: { pantry: 1825 }, defaultStorage: "pantry" },
+    { keywords: ["hummus"], life: { fridge: 14 }, defaultStorage: "fridge", afterOpening: 7 },
+    { keywords: ["salsa"], life: { pantry: 365, fridge: 14 }, defaultStorage: "pantry", afterOpening: 14 },
+    { keywords: ["guacamole"], life: { fridge: 5 }, defaultStorage: "fridge", afterOpening: 4 },
+    { keywords: ["mayo", "mayonnaise"], life: { fridge: 180 }, defaultStorage: "fridge", afterOpening: 60 },
+    { keywords: ["ketchup"], life: { pantry: 365 }, defaultStorage: "pantry", afterOpening: 180 },
+    { keywords: ["mustard"], life: { pantry: 730 }, defaultStorage: "pantry", afterOpening: 365 },
+    { keywords: ["jam", "jelly", "preserve"], life: { pantry: 365 }, defaultStorage: "pantry", afterOpening: 180 },
+    { keywords: ["pickle"], life: { pantry: 730 }, defaultStorage: "pantry", afterOpening: 30 },
+    { keywords: ["salad dressing", "ranch", "dressing"], life: { fridge: 180 }, defaultStorage: "fridge", afterOpening: 30 },
+    { keywords: ["pesto"], life: { fridge: 14 }, defaultStorage: "fridge", afterOpening: 7 },
     { keywords: ["oat"], life: { pantry: 365 }, defaultStorage: "pantry" },
     { keywords: ["cracker"], life: { pantry: 180 }, defaultStorage: "pantry" },
     { keywords: ["chip"], life: { pantry: 60 }, defaultStorage: "pantry" },
@@ -1125,6 +1166,7 @@ const FIREBASE_CONFIG = {
     if (word.endsWith("ches") || word.endsWith("shes") || word.endsWith("xes") || word.endsWith("ses")) {
       return word.slice(0, -2);
     }
+    if (word.endsWith("us")) return word;
     if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
     return word;
   }
@@ -1138,10 +1180,16 @@ const FIREBASE_CONFIG = {
       .map(singularize);
   }
 
+  const CANNED_MATCH = { matchedKeyword: "canned", life: { pantry: 730 }, defaultStorage: "pantry", afterOpening: 4 };
+
   function lookup(name) {
     if (!name) return null;
     const words = normalizeWords(name);
     if (words.length === 0) return null;
+
+    // "Canned" overrides the specific ingredient (e.g. "Canned Corn" is
+    // pantry-stable for years, not fresh corn's 3-day fridge estimate).
+    if (words.includes("canned") || words.includes("can")) return CANNED_MATCH;
 
     const maxWindow = Math.min(3, words.length);
     for (let windowSize = maxWindow; windowSize >= 1; windowSize--) {
@@ -1149,7 +1197,7 @@ const FIREBASE_CONFIG = {
         const candidate = words.slice(start, start + windowSize).join(" ");
         if (KEYWORD_MAP.has(candidate)) {
           const entry = KEYWORD_MAP.get(candidate);
-          return { matchedKeyword: candidate, life: entry.life, defaultStorage: entry.defaultStorage };
+          return { matchedKeyword: candidate, life: entry.life, defaultStorage: entry.defaultStorage, afterOpening: entry.afterOpening ?? null };
         }
       }
     }
@@ -1161,7 +1209,11 @@ const FIREBASE_CONFIG = {
     return match.life[storage] ?? match.life[match.defaultStorage] ?? Object.values(match.life)[0] ?? null;
   }
 
-  global.ShelfLifeDB = { lookup, daysFor, STORAGE_OPTIONS };
+  function daysAfterOpening(match) {
+    return match ? match.afterOpening ?? null : null;
+  }
+
+  global.ShelfLifeDB = { lookup, daysFor, daysAfterOpening, STORAGE_OPTIONS };
 })(window);
 </script>
 
@@ -1200,6 +1252,7 @@ const FIREBASE_CONFIG = {
     if (word.endsWith("ches") || word.endsWith("shes") || word.endsWith("xes") || word.endsWith("ses")) {
       return word.slice(0, -2);
     }
+    if (word.endsWith("us")) return word;
     if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
     return word;
   }
@@ -1398,7 +1451,7 @@ const FIREBASE_CONFIG = {
     { keywords: ["chicken", "ground beef", "ground turkey", "ground pork", "steak", "beef", "pork", "bacon", "sausage", "salmon", "shrimp", "fish", "turkey", "deli meat", "lunch meat", "ham", "hot dog", "tofu"], category: "Meat & Seafood" },
     { keywords: ["bread", "bagel", "tortilla"], category: "Bakery" },
     { keywords: ["ice cream", "popsicle", "frozen pizza", "frozen waffle", "frozen vegetable", "frozen fruit", "frozen meal", "frozen dinner", "hash brown", "tater tot"], category: "Frozen" },
-    { keywords: ["rice", "pasta", "flour", "sugar", "cereal", "canned bean", "canned soup", "canned vegetable", "canned good", "peanut butter", "honey", "oat", "cracker", "chip", "coffee", "tea"], category: "Pantry" },
+    { keywords: ["rice", "pasta", "flour", "sugar", "cereal", "bean", "broth", "stock", "peanut butter", "honey", "oat", "cracker", "chip", "coffee", "tea"], category: "Pantry" },
     { keywords: ["juice", "soda", "pop", "water", "gatorade"], category: "Beverages" },
     { keywords: ["leftover", "cooked rice", "soup"], category: "Leftovers" }
   ];
@@ -1411,8 +1464,13 @@ const FIREBASE_CONFIG = {
     .sort((a, b) => b.length - a.length)
     .map(kw => ({ kw, re: new RegExp("\\b" + escapeRegExp(kw) + "s?\\b", "i") }));
 
+  const CANNED_RE = /\bcanned\b/i;
+
   function lookup(name) {
     if (!name) return null;
+    // "Canned" overrides the specific ingredient — "Canned Corn" belongs in
+    // Pantry, not Produce.
+    if (CANNED_RE.test(name)) return "Pantry";
     for (const { kw, re } of COMPILED) {
       if (re.test(name)) return KEYWORD_MAP.get(kw);
     }
@@ -1427,7 +1485,7 @@ const FIREBASE_CONFIG = {
 (function () {
   "use strict";
 
-  /** @typedef {{id:string,name:string,qty:string,category:string,storage:string,expiry:string,addedAt:string}} Item */
+  /** @typedef {{id:string,name:string,qty:string,category:string,storage:string,expiry:string,addedAt:string,noExpiration:boolean,openedAt:(string|null)}} Item */
 
   /** @type {Item[]} */
   let items = [];
@@ -1521,7 +1579,7 @@ const FIREBASE_CONFIG = {
     if (!force && localStorage.getItem(NOTIFY_LAST_KEY) === today) return;
 
     const urgent = items.filter(i => {
-      const u = urgencyOf(i.expiry);
+      const u = urgencyOf(effectiveExpiry(i));
       return u === "expired" || u === "today";
     });
     if (urgent.length === 0) return;
@@ -1573,6 +1631,7 @@ const FIREBASE_CONFIG = {
   }
 
   function urgencyOf(dateStr) {
+    if (!dateStr) return "fresh";
     const diff = daysUntil(dateStr);
     if (diff < 0) return "expired";
     if (diff === 0) return "today";
@@ -1581,6 +1640,7 @@ const FIREBASE_CONFIG = {
   }
 
   function expiryNote(dateStr) {
+    if (!dateStr) return "No expiration";
     const diff = daysUntil(dateStr);
     if (diff < 0) return `Expired ${Math.abs(diff)}d ago`;
     if (diff === 0) return "Expires today";
@@ -1588,9 +1648,41 @@ const FIREBASE_CONFIG = {
     return `Expires in ${diff}d`;
   }
 
+  // The date urgency/sorting should actually key off: raw expiry, unless the
+  // item has been opened and has a known "use within Nd of opening" shelf
+  // life that's sooner (or the item has no inherent expiry at all, like a
+  // sealed can, until it's opened).
+  function effectiveExpiry(item) {
+    if (item.openedAt) {
+      const match = ShelfLifeDB.lookup(item.name);
+      const afterDays = ShelfLifeDB.daysAfterOpening(match);
+      if (afterDays != null) {
+        const opened = parseDateLocal(item.openedAt);
+        opened.setDate(opened.getDate() + afterDays);
+        const openedExpiry = toDateStr(opened);
+        if (item.noExpiration) return openedExpiry;
+        return openedExpiry < item.expiry ? openedExpiry : item.expiry;
+      }
+    }
+    return item.noExpiration ? null : item.expiry;
+  }
+
+  function sortKey(item) {
+    return effectiveExpiry(item) || "9999-12-31";
+  }
+
+  function formatDateTime(isoStr) {
+    return new Date(isoStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
   function formatDate(dateStr) {
     const d = parseDateLocal(dateStr);
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function formatDateShort(dateStr) {
+    const d = parseDateLocal(dateStr);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
 
   function toDateStr(date) {
@@ -1626,7 +1718,16 @@ const FIREBASE_CONFIG = {
   const itemCategoryInput = document.getElementById("itemCategory");
   const itemStorageInput = document.getElementById("itemStorage");
   const itemExpiryInput = document.getElementById("itemExpiry");
+  const itemNoExpiryInput = document.getElementById("itemNoExpiry");
   const expiryHintEl = document.getElementById("expiryHint");
+
+  itemNoExpiryInput.addEventListener("change", () => {
+    itemExpiryInput.disabled = itemNoExpiryInput.checked;
+    if (itemNoExpiryInput.checked) {
+      expiryHintEl.textContent = "";
+      expiryHintEl.classList.remove("has-match");
+    }
+  });
 
   const CATEGORIES = ["Produce", "Dairy", "Meat & Seafood", "Bakery", "Frozen", "Pantry", "Beverages", "Leftovers", "Other"];
   const DEFAULT_STORAGE = "fridge";
@@ -1676,7 +1777,7 @@ const FIREBASE_CONFIG = {
 
   function renderSummary() {
     const counts = { expired: 0, today: 0, soon: 0, fresh: 0 };
-    items.forEach(i => { counts[urgencyOf(i.expiry)]++; });
+    items.forEach(i => { counts[urgencyOf(effectiveExpiry(i))]++; });
 
     document.getElementById("countExpired").textContent = counts.expired;
     document.getElementById("countToday").textContent = counts.today;
@@ -1691,7 +1792,7 @@ const FIREBASE_CONFIG = {
   function getFilteredItems() {
     const search = state.search.trim().toLowerCase();
     return items.filter(i => {
-      if (state.urgency && urgencyOf(i.expiry) !== state.urgency) return false;
+      if (state.urgency && urgencyOf(effectiveExpiry(i)) !== state.urgency) return false;
       if (state.category && i.category !== state.category) return false;
       if (state.storage && i.storage !== state.storage) return false;
       if (search && !i.name.toLowerCase().includes(search)) return false;
@@ -1717,8 +1818,8 @@ const FIREBASE_CONFIG = {
 
     GROUP_DEFS.forEach(def => {
       const groupItems = filtered
-        .filter(i => urgencyOf(i.expiry) === def.key)
-        .sort((a, b) => a.expiry.localeCompare(b.expiry) || a.name.localeCompare(b.name));
+        .filter(i => urgencyOf(effectiveExpiry(i)) === def.key)
+        .sort((a, b) => sortKey(a).localeCompare(sortKey(b)) || a.name.localeCompare(b.name));
 
       if (groupItems.length === 0) return;
 
@@ -1730,7 +1831,22 @@ const FIREBASE_CONFIG = {
       titleEl.innerHTML = `<span class="dot"></span>${escapeHtml(def.title)} (${groupItems.length})`;
       groupEl.appendChild(titleEl);
 
-      groupItems.forEach(item => groupEl.appendChild(renderItemCard(item, def.key)));
+      CATEGORIES.forEach(cat => {
+        const catItems = groupItems.filter(i => (i.category || "Other") === cat);
+        if (catItems.length === 0) return;
+
+        const catEl = document.createElement("div");
+        catEl.className = "category-subgroup";
+
+        const catTitleEl = document.createElement("h3");
+        catTitleEl.className = "category-subtitle";
+        catTitleEl.textContent = `${cat} (${catItems.length})`;
+        catEl.appendChild(catTitleEl);
+
+        catItems.forEach(item => catEl.appendChild(renderItemCard(item, def.key)));
+        groupEl.appendChild(catEl);
+      });
+
       groupsContainer.appendChild(groupEl);
     });
   }
@@ -1748,12 +1864,15 @@ const FIREBASE_CONFIG = {
           <span class="badge">${escapeHtml(item.category)}</span>
           ${item.storage ? `<span class="badge">${escapeHtml(storageLabel(item.storage))}</span>` : ""}
           ${item.qty ? `<span class="badge">${escapeHtml(item.qty)}</span>` : ""}
-          <span>${formatDate(item.expiry)}</span>
+          ${item.addedAt ? `<span class="badge added-badge">Added ${formatDateTime(item.addedAt)}</span>` : ""}
+          ${item.openedAt ? `<span class="badge opened-badge">Opened ${formatDateShort(item.openedAt)}</span>` : ""}
+          <span>${item.noExpiration ? "No expiration" : formatDate(item.expiry)}</span>
         </div>
       </div>
-      <div class="item-expiry-note">${escapeHtml(expiryNote(item.expiry))}</div>
+      <div class="item-expiry-note">${escapeHtml(expiryNote(effectiveExpiry(item)))}</div>
       <div class="item-actions">
         <button class="icon-btn eat-btn" title="Mark as eaten">✓ Eaten</button>
+        <button class="icon-btn open-toggle-btn" title="${item.openedAt ? "Clear opened date" : "Mark as opened"}">${item.openedAt ? "📦 Opened ✕" : "📦 Opened"}</button>
         <button class="icon-btn edit-btn" title="Edit item">✎</button>
         <button class="icon-btn danger remove-btn" title="Remove item">✖</button>
       </div>
@@ -1770,6 +1889,11 @@ const FIREBASE_CONFIG = {
     card.querySelector(".eat-btn").addEventListener("click", () => removeItem(item.id, "eaten"));
     card.querySelector(".remove-btn").addEventListener("click", () => removeItem(item.id, "removed"));
     card.querySelector(".edit-btn").addEventListener("click", () => startEdit(card, item));
+    card.querySelector(".open-toggle-btn").addEventListener("click", () => {
+      const updated = { ...item, openedAt: item.openedAt ? null : toDateStr(startOfToday()) };
+      upsertItem(updated).catch(() => showToast("Couldn't save — check your connection."));
+      showToast(updated.openedAt ? `Marked ${item.name} as opened.` : `Cleared opened date for ${item.name}.`);
+    });
 
     return card;
   }
@@ -1781,14 +1905,22 @@ const FIREBASE_CONFIG = {
         <input type="text" class="edit-qty" value="${escapeHtml(item.qty)}" placeholder="Qty" style="flex:1; min-width:70px;">
         <select class="edit-category" style="flex:1; min-width:110px;"></select>
         <select class="edit-storage" style="flex:1; min-width:110px;"></select>
-        <input type="date" class="edit-expiry" value="${item.expiry}" style="flex:1; min-width:130px;">
+        <input type="date" class="edit-expiry" value="${item.expiry}" ${item.noExpiration ? "disabled" : ""} style="flex:1; min-width:130px;">
         <button type="button" class="icon-btn edit-suggest-btn" title="Suggest date from typical shelf life">🔮</button>
+        <label class="no-expiry-label" style="flex-basis:100%;"><input type="checkbox" class="edit-no-expiry" ${item.noExpiration ? "checked" : ""}> Doesn't expire (e.g. canned goods)</label>
+        <label class="opened-date-label" style="flex:1; min-width:160px;">Opened (optional)<input type="date" class="edit-opened" value="${item.openedAt || ""}"></label>
       </div>
       <div class="item-actions">
         <button class="icon-btn save-btn" title="Save">Save</button>
         <button class="icon-btn cancel-btn" title="Cancel">Cancel</button>
       </div>
     `;
+
+    const noExpiryCheckbox = card.querySelector(".edit-no-expiry");
+    const expiryInput = card.querySelector(".edit-expiry");
+    noExpiryCheckbox.addEventListener("change", () => {
+      expiryInput.disabled = noExpiryCheckbox.checked;
+    });
 
     const categorySelect = card.querySelector(".edit-category");
     categorySelect.innerHTML = CATEGORIES.map(c =>
@@ -1818,8 +1950,10 @@ const FIREBASE_CONFIG = {
 
     card.querySelector(".save-btn").addEventListener("click", () => {
       const name = card.querySelector(".edit-name").value.trim();
-      const expiry = card.querySelector(".edit-expiry").value;
-      if (!name || !expiry) {
+      const noExpiration = noExpiryCheckbox.checked;
+      const expiry = expiryInput.value;
+      const openedAt = card.querySelector(".edit-opened").value || null;
+      if (!name || (!noExpiration && !expiry)) {
         showToast("Name and expiration date are required.");
         return;
       }
@@ -1829,7 +1963,9 @@ const FIREBASE_CONFIG = {
         qty: card.querySelector(".edit-qty").value.trim(),
         category: categorySelect.value,
         storage: storageSelect.value,
-        expiry
+        expiry,
+        noExpiration,
+        openedAt
       };
       upsertItem(updated).catch(() => showToast("Couldn't save — check your connection."));
       showToast(`Updated ${name}.`);
@@ -1961,8 +2097,13 @@ const FIREBASE_CONFIG = {
     updateShelfLifeHint();
   });
 
+  const STORAGE_TO_CATEGORY = { pantry: "Pantry", freezer: "Frozen" };
+
   itemStorageInput.addEventListener("change", () => {
     storageTouchedByUser = true;
+    if (!categoryTouchedByUser && STORAGE_TO_CATEGORY[itemStorageInput.value]) {
+      itemCategoryInput.value = STORAGE_TO_CATEGORY[itemStorageInput.value];
+    }
     updateShelfLifeHint();
   });
 
@@ -1983,8 +2124,9 @@ const FIREBASE_CONFIG = {
   addForm.addEventListener("submit", e => {
     e.preventDefault();
     const name = itemNameInput.value.trim();
+    const noExpiration = itemNoExpiryInput.checked;
     const expiry = itemExpiryInput.value;
-    if (!name || !expiry) return;
+    if (!name || (!noExpiration && !expiry)) return;
 
     const newItem = {
       id: genId(),
@@ -1993,6 +2135,8 @@ const FIREBASE_CONFIG = {
       category: itemCategoryInput.value,
       storage: itemStorageInput.value,
       expiry,
+      noExpiration,
+      openedAt: null,
       addedAt: new Date().toISOString()
     };
 
@@ -2002,6 +2146,7 @@ const FIREBASE_CONFIG = {
     addForm.reset();
     itemCategoryInput.value = "Other";
     itemStorageInput.value = DEFAULT_STORAGE;
+    itemExpiryInput.disabled = false;
     dateTouchedByUser = false;
     storageTouchedByUser = false;
     categoryTouchedByUser = false;
@@ -2125,6 +2270,8 @@ const FIREBASE_CONFIG = {
   window.GroceryTracker = {
     getItems: () => items,
     urgencyOf,
+    effectiveExpiry,
+    sortKey,
     getDb: () => firestoreDb,
     upsertItem,
     genId,
@@ -2328,9 +2475,9 @@ if ("serviceWorker" in navigator) {
     }
 
     findBtn.disabled = false;
-    const sorted = [...items].sort((a, b) => a.expiry.localeCompare(b.expiry));
+    const sorted = [...items].sort((a, b) => window.GroceryTracker.sortKey(a).localeCompare(window.GroceryTracker.sortKey(b)));
     checklistEl.innerHTML = sorted.map(item => {
-      const urgency = window.GroceryTracker.urgencyOf(item.expiry);
+      const urgency = window.GroceryTracker.urgencyOf(window.GroceryTracker.effectiveExpiry(item));
       const checked = urgency !== "fresh" ? "checked" : "";
       return `<label class="recipe-check-item ${urgency}"><input type="checkbox" value="${escapeHtml(item.name)}" ${checked}>${escapeHtml(item.name)}</label>`;
     }).join("");
@@ -3001,6 +3148,8 @@ if ("serviceWorker" in navigator) {
       category: "Other",
       storage,
       expiry: gt.addDays(days),
+      noExpiration: false,
+      openedAt: null,
       addedAt: new Date().toISOString()
     };
     gt.upsertItem(groceryItem).catch(() => {});
