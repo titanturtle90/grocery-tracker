@@ -139,18 +139,6 @@ body {
   font-size: 0.92rem;
 }
 
-.sync-status {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 5px 12px;
-  white-space: nowrap;
-}
-.sync-status.synced { color: var(--fresh-fg); border-color: var(--fresh-border); }
-.sync-status.error { color: var(--expired-fg); border-color: var(--expired-border); }
-
 .header-actions {
   display: flex;
   align-items: center;
@@ -828,7 +816,6 @@ button {
     </div>
     <div class="header-actions">
       <button id="notifyBtn" class="ghost-btn" type="button" hidden>🔔 Enable alerts</button>
-      <span id="syncStatus" class="sync-status">🔄 Connecting…</span>
     </div>
   </header>
 
@@ -1506,6 +1493,7 @@ const FIREBASE_CONFIG = {
   let firestoreDb = null;
 
   function setSyncStatus(status, text) {
+    if (!syncStatusEl) return;
     syncStatusEl.className = "sync-status " + status;
     syncStatusEl.textContent = text;
   }
