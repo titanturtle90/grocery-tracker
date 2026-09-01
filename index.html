@@ -276,6 +276,58 @@ button {
 .controls input[type="text"] { flex: 1; min-width: 160px; }
 .controls select { max-width: 200px; }
 
+.sort-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+.sort-toggle-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color 0.15s ease;
+  cursor: pointer;
+}
+.sort-toggle-label.active { color: var(--text); }
+
+.ios-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 25px;
+  flex-shrink: 0;
+}
+.ios-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.ios-switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.ios-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 21px;
+  height: 21px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease;
+}
+.ios-switch input:checked + .ios-switch-track { background: var(--accent); }
+.ios-switch input:checked + .ios-switch-track .ios-switch-knob { transform: translateX(17px); }
+.ios-switch input:focus-visible + .ios-switch-track { box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.3); }
+
 .ghost-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -799,7 +851,7 @@ button {
   .item-card { flex-wrap: wrap; }
   .item-main { flex-basis: 100%; }
   .item-name { white-space: normal; overflow: visible; text-overflow: clip; }
-  .item-expiry-note { order: 3; }
+  .item-expiry-note { order: 3; flex-basis: 100%; white-space: nowrap; }
 }
 </style>
 </head>
@@ -891,10 +943,14 @@ button {
     <select id="storageFilter">
       <option value="">All locations</option>
     </select>
-    <select id="sortMode">
-      <option value="status">Sort: Status &amp; Category</option>
-      <option value="expiry">Sort: Expiring Soonest</option>
-    </select>
+    <div class="sort-toggle">
+      <span class="sort-toggle-label" data-for="status">Status &amp; Category</span>
+      <label class="ios-switch">
+        <input type="checkbox" id="sortModeToggle">
+        <span class="ios-switch-track"><span class="ios-switch-knob"></span></span>
+      </label>
+      <span class="sort-toggle-label" data-for="expiry">Expiry Date</span>
+    </div>
     <button id="clearFilters" class="ghost-btn" type="button">Clear filters</button>
     <button id="toggleGrocerySelect" class="ghost-btn" type="button">☑️ Select</button>
   </section>
@@ -1731,7 +1787,8 @@ const FIREBASE_CONFIG = {
   const searchBox = document.getElementById("searchBox");
   const categoryFilter = document.getElementById("categoryFilter");
   const storageFilter = document.getElementById("storageFilter");
-  const sortModeSelect = document.getElementById("sortMode");
+  const sortModeToggle = document.getElementById("sortModeToggle");
+  const sortToggleLabels = document.querySelectorAll(".sort-toggle-label");
   const clearFiltersBtn = document.getElementById("clearFilters");
 
   const toggleSelectBtn = document.getElementById("toggleGrocerySelect");
@@ -1878,7 +1935,7 @@ const FIREBASE_CONFIG = {
       <div class="item-expiry-note">${escapeHtml(expiryNote(effectiveExpiry(item)))}</div>
       <div class="item-actions">
         <button class="icon-btn eat-btn" title="Mark as eaten">✓ Eaten</button>
-        <button class="icon-btn open-toggle-btn" title="${item.openedAt ? "Clear opened date" : "Mark as opened"}">${item.openedAt ? "📦 Opened ✕" : "📦 Opened"}</button>
+        <button class="icon-btn open-toggle-btn" title="${item.openedAt ? "Undo — clear the opened date" : "Mark as opened"}">${item.openedAt ? "↩️ Undo Opened" : "📦 Opened"}</button>
         <button class="icon-btn edit-btn" title="Edit item">✎</button>
         <button class="icon-btn danger remove-btn" title="Remove item">✖</button>
       </div>
@@ -2176,10 +2233,22 @@ const FIREBASE_CONFIG = {
     renderList();
   });
 
-  sortModeSelect.addEventListener("change", () => {
-    state.sortMode = sortModeSelect.value;
+  function setSortMode(mode) {
+    state.sortMode = mode;
+    sortModeToggle.checked = mode === "expiry";
+    sortToggleLabels.forEach(el => el.classList.toggle("active", el.dataset.for === mode));
     renderList();
+  }
+
+  sortModeToggle.addEventListener("change", () => {
+    setSortMode(sortModeToggle.checked ? "expiry" : "status");
   });
+
+  sortToggleLabels.forEach(el => {
+    el.addEventListener("click", () => setSortMode(el.dataset.for));
+  });
+
+  setSortMode(state.sortMode);
 
   summaryBar.addEventListener("click", e => {
     const pill = e.target.closest(".summary-pill");
@@ -2195,13 +2264,11 @@ const FIREBASE_CONFIG = {
     state.category = "";
     state.storage = "";
     state.urgency = "";
-    state.sortMode = "status";
     searchBox.value = "";
     categoryFilter.value = "";
     storageFilter.value = "";
-    sortModeSelect.value = "status";
     renderSummary();
-    renderList();
+    setSortMode("status");
   });
 
   // ---------- batch select ----------
