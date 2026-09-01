@@ -891,6 +891,10 @@ button {
     <select id="storageFilter">
       <option value="">All locations</option>
     </select>
+    <select id="sortMode">
+      <option value="status">Sort: Status &amp; Category</option>
+      <option value="expiry">Sort: Expiring Soonest</option>
+    </select>
     <button id="clearFilters" class="ghost-btn" type="button">Clear filters</button>
     <button id="toggleGrocerySelect" class="ghost-btn" type="button">☑️ Select</button>
   </section>
@@ -1483,7 +1487,8 @@ const FIREBASE_CONFIG = {
     search: "",
     category: "",
     storage: "",
-    urgency: "" // '', 'expired', 'today', 'soon', 'fresh'
+    urgency: "", // '', 'expired', 'today', 'soon', 'fresh'
+    sortMode: "status" // 'status' (grouped) or 'expiry' (flat, soonest first)
   };
 
   // ---------- Firebase (cloud sync) ----------
@@ -1726,6 +1731,7 @@ const FIREBASE_CONFIG = {
   const searchBox = document.getElementById("searchBox");
   const categoryFilter = document.getElementById("categoryFilter");
   const storageFilter = document.getElementById("storageFilter");
+  const sortModeSelect = document.getElementById("sortMode");
   const clearFiltersBtn = document.getElementById("clearFilters");
 
   const toggleSelectBtn = document.getElementById("toggleGrocerySelect");
@@ -1806,6 +1812,15 @@ const FIREBASE_CONFIG = {
       return;
     }
     emptyState.hidden = true;
+
+    if (state.sortMode === "expiry") {
+      const sorted = [...filtered].sort((a, b) => sortKey(a).localeCompare(sortKey(b)) || a.name.localeCompare(b.name));
+      const flatEl = document.createElement("div");
+      flatEl.className = "group";
+      sorted.forEach(item => flatEl.appendChild(renderItemCard(item, urgencyOf(effectiveExpiry(item)))));
+      groupsContainer.appendChild(flatEl);
+      return;
+    }
 
     GROUP_DEFS.forEach(def => {
       const groupItems = filtered
@@ -2161,6 +2176,11 @@ const FIREBASE_CONFIG = {
     renderList();
   });
 
+  sortModeSelect.addEventListener("change", () => {
+    state.sortMode = sortModeSelect.value;
+    renderList();
+  });
+
   summaryBar.addEventListener("click", e => {
     const pill = e.target.closest(".summary-pill");
     if (!pill) return;
@@ -2175,9 +2195,11 @@ const FIREBASE_CONFIG = {
     state.category = "";
     state.storage = "";
     state.urgency = "";
+    state.sortMode = "status";
     searchBox.value = "";
     categoryFilter.value = "";
     storageFilter.value = "";
+    sortModeSelect.value = "status";
     renderSummary();
     renderList();
   });
@@ -2594,9 +2616,18 @@ if ("serviceWorker" in navigator) {
     { name: "Turkey Sandwich", required: [["turkey"], ["bread"]],
       ingredients: ["Sliced turkey", "Bread", "Cheese, lettuce, tomato (optional)", "Mustard or mayo"],
       steps: ["Spread mustard or mayo on the bread.", "Layer with turkey, cheese, lettuce, and tomato.", "Close the sandwich and slice."] },
-    { name: "Classic Omelette", required: [["egg"], ["cheese", "cheddar", "mozzarella"]],
-      ingredients: ["Eggs", "Shredded cheese", "Butter", "Vegetables or herbs (optional)"],
-      steps: ["Whisk the eggs and pour into a hot, buttered skillet.", "Let the eggs set around the edges, then add cheese (and any fillings) to one half.", "Fold the omelette in half and cook until the cheese melts."] },
+    { name: "Vegetable & Cheese Omelette",
+      required: [["egg"]],
+      any: [["cheese", "cheddar", "mozzarella"], ["pepper", "bell pepper"], ["onion"], ["mushroom"], ["spinach"], ["tomato"], ["ham"], ["bacon"], ["sausage"], ["potato"]],
+      minAny: 1,
+      ingredients: ["Eggs", "Butter", "Whatever fillings you have — cheese, peppers, onions, mushrooms, spinach, ham, etc."],
+      steps: ["Whisk the eggs and pour into a hot, buttered skillet.", "Sauté any raw fillings (peppers, onions, mushrooms) first until softened, then set aside.", "Let the eggs set around the edges, then add the fillings to one half.", "Fold the omelette in half and cook until set (and cheese, if using, melts)."] },
+    { name: "Vegetable Scramble",
+      required: [["egg"]],
+      any: [["pepper", "bell pepper"], ["onion"], ["mushroom"], ["spinach"], ["tomato"], ["broccoli"], ["zucchini"]],
+      minAny: 1,
+      ingredients: ["Eggs", "Butter or oil", "Whatever vegetables you have on hand"],
+      steps: ["Sauté the vegetables in a hot, buttered skillet until softened, 3-5 minutes.", "Whisk the eggs and pour over the vegetables.", "Gently stir until the eggs are just set."] },
     { name: "Fluffy Pancakes", required: [["flour"], ["egg"]],
       ingredients: ["1 1/2 cups flour", "1 egg", "1 1/4 cups milk", "2 tbsp sugar, 1 tbsp baking powder, pinch of salt", "Butter for the pan"],
       steps: ["Whisk together the flour, sugar, baking powder, and salt.", "Add the egg and milk and stir just until combined — a few lumps are fine.", "Cook 1/4-cup scoops on a buttered griddle until bubbles form, then flip and cook the other side."] },
@@ -2614,20 +2645,38 @@ if ("serviceWorker" in navigator) {
       steps: ["Cook the pasta according to package directions.", "Melt butter with garlic, then stir in cream and simmer until slightly thickened.", "Stir in parmesan until the sauce is smooth.", "Toss with pasta and sliced chicken."] }
   ];
 
+  // Most curated recipes are matched by a fixed AND-of-groups ("required").
+  // But some dishes (omelettes, scrambles, stir-fries) are really "a core
+  // ingredient plus whatever mix-ins you happen to have" — for those, an
+  // optional "any" list of groups + "minAny" (default 1) lets the recipe
+  // match on any subset of common fillings instead of one hardcoded combo.
   function findStapleRecipes(selectedNames) {
     const results = [];
     for (const recipe of STAPLE_RECIPES) {
       const matchedItems = [];
-      let allGroupsMatched = true;
+      let ok = true;
       for (const group of recipe.required) {
         const patterns = kwRegexes(group);
         const hit = selectedNames.find(name => patterns.some(re => re.test(name)));
-        if (!hit) { allGroupsMatched = false; break; }
+        if (!hit) { ok = false; break; }
         if (!matchedItems.includes(hit)) matchedItems.push(hit);
       }
-      if (allGroupsMatched) {
-        results.push({ source: "staple", strMeal: recipe.name, matchedItems, ingredients: recipe.ingredients, steps: recipe.steps });
+      if (!ok) continue;
+
+      if (recipe.any && recipe.any.length) {
+        let anyCount = 0;
+        for (const group of recipe.any) {
+          const patterns = kwRegexes(group);
+          const hit = selectedNames.find(name => patterns.some(re => re.test(name)));
+          if (hit) {
+            anyCount++;
+            if (!matchedItems.includes(hit)) matchedItems.push(hit);
+          }
+        }
+        if (anyCount < (recipe.minAny || 1)) continue;
       }
+
+      results.push({ source: "staple", strMeal: recipe.name, matchedItems, ingredients: recipe.ingredients, steps: recipe.steps });
     }
     return results;
   }
