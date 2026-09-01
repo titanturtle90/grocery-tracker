@@ -245,7 +245,10 @@ input[type="text"], input[type="date"], select {
   border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
-  font-size: 0.9rem;
+  /* iOS Safari zooms the page in on focus if a text input's rendered
+     font-size is under 16px — keep this at 16px (not a smaller rem value)
+     to prevent that, even though it reads a touch larger on desktop. */
+  font-size: 16px;
   width: 100%;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
