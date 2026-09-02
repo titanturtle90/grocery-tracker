@@ -151,17 +151,13 @@ body {
 .summary-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
 .summary-pill {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 5px;
   border-radius: var(--radius);
-  padding: 6px 6px;
+  padding: 10px 8px;
   text-align: center;
   border: 1px solid;
   cursor: pointer;
@@ -170,8 +166,8 @@ body {
 }
 .summary-pill:hover { filter: brightness(0.97); }
 .summary-pill.active { outline: 2px solid var(--accent); outline-offset: 1px; }
-.summary-pill .count { font-family: var(--font-heading); font-size: 1.05rem; font-weight: 800; line-height: 1; }
-.summary-pill .label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; }
+.summary-pill .count { display: block; font-family: var(--font-heading); font-size: 1.5rem; font-weight: 800; line-height: 1.2; }
+.summary-pill .label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
 
 .summary-pill.expired { background: var(--expired-bg); color: var(--expired-fg); border-color: var(--expired-border); }
 .summary-pill.today { background: var(--today-bg); color: var(--today-fg); border-color: var(--today-border); }
@@ -851,9 +847,7 @@ button {
   .field-storage { grid-column: span 1; }
   .field-submit { grid-column: 1 / -1; }
   .field-submit button { width: 100%; }
-  .summary-pill { flex-direction: column; gap: 1px; padding: 6px 2px; }
-  .summary-pill .count { font-size: 0.95rem; }
-  .summary-pill .label { font-size: 0.56rem; white-space: normal; line-height: 1.1; }
+  .summary-bar { grid-template-columns: repeat(2, 1fr); }
   .item-card { flex-wrap: wrap; }
   .item-main { flex-basis: 100%; }
   .item-name { white-space: normal; overflow: visible; text-overflow: clip; }
@@ -2407,8 +2401,15 @@ if ("serviceWorker" in navigator) {
   const AREA_CACHE_KEY = "grocery-tracker-mealdb-areas-v1";
   const LIST_CACHE_DAYS = 30;
 
+  const MAX_MEALDB_RESULTS = 90;
+
   const SPOONACULAR_BASE = "https://api.spoonacular.com/";
   const SPOONACULAR_KEY_STORAGE = "nexpire-spoonacular-key";
+  // findByIngredients costs 1 point + 0.01/recipe, against a 150 point/day
+  // free quota — so 40 results costs 1.4 points vs 1.1 for 10. That's ~105
+  // searches a day even before counting recipe detail views (1 point each),
+  // far more than personal use needs, for 4x the photo-backed results.
+  const SPOONACULAR_RESULT_COUNT = 40;
 
   let canonicalIngredients = null;
   const recipeDetailCache = new Map();
@@ -2532,21 +2533,163 @@ if ("serviceWorker" in navigator) {
     }
   }
 
-  function findCanonicalIngredient(itemName, canonicalList) {
-    const shelfMatch = window.ShelfLifeDB ? window.ShelfLifeDB.lookup(itemName) : null;
-    const candidates = [];
-    if (shelfMatch) candidates.push(shelfMatch.matchedKeyword);
-    candidates.push(itemName.toLowerCase().trim());
+  // TheMealDB's filter.php only accepts one canonical ingredient name at a
+  // time, and its vocabulary is very literal: "Potatoes" has 84 recipes while
+  // "Potato" has none, "Chicken Breast" (17) and "Chicken Breasts" (11) are
+  // separate entries, and there is no "Pasta" or "Bell Pepper" entry at all.
+  // Matching each grocery item to a single canonical name therefore threw
+  // away most of the real, photo-backed recipes the API actually has — and
+  // sometimes matched the wrong thing entirely (plain "Potato" used to fall
+  // through to "Potato Starch", 2 recipes). We now expand each item into a
+  // short, ranked list of canonical names and query all of them.
 
-    for (const cand of candidates) {
-      if (!cand) continue;
-      let hit = canonicalList.find(c => c.toLowerCase() === cand);
-      if (hit) return hit;
-      const re = new RegExp("\\b" + escapeRegExp(cand) + "\\b", "i");
-      hit = canonicalList.find(c => re.test(c));
-      if (hit) return hit;
+  // Words that make a canonical name a *different food* from the bare item:
+  // "Chicken Stock" is not chicken, "Tomato Ketchup" is not a tomato. Also
+  // covers non-dairy/preserved stand-ins so "Milk" doesn't pull in coconut
+  // milk curries. Skipped for an exact name match, so an item literally
+  // called "Coconut Milk" still matches "Coconut Milk".
+  const DERIVATIVE_WORDS = new Set([
+    "stock", "broth", "bouillon", "cube", "cubes", "concentrate", "vinegar",
+    "wine", "sauce", "ketchup", "puree", "paste", "powder", "starch", "oil",
+    "juice", "flour", "chocolate", "krispies", "noodle", "noodles",
+    "vermicelli", "seed", "seeds", "extract", "essence", "syrup", "jam",
+    "jelly", "cider", "soup", "gravy", "spread", "dressing", "mix", "crisps",
+    "chips", "granules", "almond", "coconut", "soya", "soy", "oat",
+    "condensed", "evaporated", "powdered", "dried", "vegan", "flax"
+  ]);
+
+  // Cuts/parts: "Chicken Thighs" is still chicken, "Beef Brisket" still beef.
+  const CUT_WORDS = new Set([
+    "breast", "thigh", "leg", "wing", "drumstick", "fillet", "chop", "mince",
+    "minced", "ground", "tenderloin", "shoulder", "belly", "steak", "rib",
+    "liver", "kidney", "shin", "brisket", "cutlet", "cheek", "knuckle",
+    "flank", "loin", "shank", "joint", "tender"
+  ]);
+
+  // Confirmed gaps in TheMealDB's ingredient vocabulary — these items have no
+  // canonical entry at all, so they used to match zero recipes. Mapped onto
+  // the specific names the API does carry (verified against list.php?i=list).
+  const INGREDIENT_SYNONYMS = {
+    "pasta": ["Spaghetti", "Macaroni", "Farfalle", "Linguine Pasta", "Lasagne Sheets", "Tagliatelle", "Penne Pasta"],
+    "bell pepper": ["Red Pepper", "Green Pepper", "Yellow Pepper"],
+    "sweet pepper": ["Red Pepper", "Green Pepper", "Yellow Pepper"],
+    "capsicum": ["Red Pepper", "Green Pepper", "Yellow Pepper"],
+    "scallion": ["Spring Onions", "Green Onions"],
+    "green onion": ["Spring Onions", "Green Onions"],
+    "cilantro": ["Coriander", "Fresh Coriander"],
+    "aubergine": ["Egg Plants"],
+    "eggplant": ["Egg Plants"],
+    "courgette": ["Zucchini"],
+    "garbanzo bean": ["Chickpeas"],
+    "cornstarch": ["Corn Flour"],
+    "shrimp": ["Shrimp", "Prawns", "King Prawns"],
+    "prawn": ["Prawns", "King Prawns", "Shrimp"]
+  };
+
+  function singularize(word) {
+    if (word.length <= 3) return word;
+    if (word.endsWith("ies")) return word.slice(0, -3) + "y";
+    if (word.endsWith("oes")) return word.slice(0, -2);
+    if (word.endsWith("es") && word.length > 4) return word.slice(0, -2);
+    if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+    return word;
+  }
+
+  function normalizeIngredient(str) {
+    const words = (str || "").toLowerCase().match(/[a-z]+/g) || [];
+    return words.map(singularize).join(" ");
+  }
+
+  // Ranked canonical names for one search term: exact match first, then
+  // subtypes ("Cheddar Cheese" is a cheese) and cuts ("Chicken Thighs").
+  function canonicalVariantsForTerm(term, canonicalList) {
+    const t = normalizeIngredient(term);
+    if (!t) return [];
+
+    const synonyms = INGREDIENT_SYNONYMS[t];
+    if (synonyms) {
+      const known = synonyms.filter(s => canonicalList.some(c => c.toLowerCase() === s.toLowerCase()));
+      if (known.length) return known;
     }
-    return null;
+
+    const scored = [];
+    for (const name of canonicalList) {
+      const words = name.toLowerCase().match(/[a-z]+/g) || [];
+      if (!words.length) continue;
+      const n = words.map(singularize).join(" ");
+
+      if (n === t) {
+        scored.push({ tier: 0, len: words.length, name });
+        continue;
+      }
+      if (words.some(w => DERIVATIVE_WORDS.has(singularize(w)))) continue;
+
+      if (n.endsWith(" " + t)) {
+        scored.push({ tier: 1, len: words.length, name });
+      } else if (n.startsWith(t + " ")) {
+        const rest = n.slice(t.length + 1).split(" ");
+        if (rest.every(w => CUT_WORDS.has(w))) scored.push({ tier: 1, len: words.length, name });
+      }
+    }
+
+    scored.sort((a, b) => a.tier - b.tier || a.len - b.len || a.name.localeCompare(b.name));
+    return scored.map(s => s.name);
+  }
+
+  const MAX_VARIANTS_PER_ITEM = 3;
+
+  // Real grocery items are rarely bare ingredient names — they're "Shredded
+  // Cheddar Cheese", "Spaghetti Pasta", "Canned Green Beans", "Pork Loin
+  // Chops". Back off toward the head noun (drop leading modifiers one at a
+  // time), then, only if that finds nothing, toward the leading word, which
+  // is what carries the meaning for meats ("Chicken Tenders" -> chicken).
+  // A candidate made only of cut words ("chop", "loin chop") names no food at
+  // all — backing off to it matched "Pork Loin Chops" against TheMealDB's
+  // "Lamb Loin Chops" — so those candidates are skipped and the leading-word
+  // fallback ("pork") is used instead.
+  function termCandidates(term) {
+    const words = normalizeIngredient(term).split(" ").filter(Boolean);
+    if (!words.length) return [];
+    const out = [];
+    const push = c => { if (c && !out.includes(c)) out.push(c); };
+    for (let i = 0; i < words.length; i++) {
+      const tail = words.slice(i);
+      if (tail.every(w => CUT_WORDS.has(w))) continue;
+      push(tail.join(" "));
+    }
+    for (let j = words.length - 1; j >= 1; j--) push(words.slice(0, j).join(" "));
+    return out;
+  }
+
+  function findCanonicalIngredients(itemName, canonicalList) {
+    const shelfMatch = window.ShelfLifeDB ? window.ShelfLifeDB.lookup(itemName) : null;
+    const terms = [itemName];
+    if (shelfMatch && shelfMatch.matchedKeyword) terms.push(shelfMatch.matchedKeyword);
+
+    for (const term of terms) {
+      for (const candidate of termCandidates(term)) {
+        const variants = canonicalVariantsForTerm(candidate, canonicalList);
+        // First candidate that resolves wins — a broader fallback should not
+        // pile extra noise on top of a precise match.
+        if (variants.length) return variants.slice(0, MAX_VARIANTS_PER_ITEM);
+      }
+    }
+    return [];
+  }
+
+  // Keep the network polite: TheMealDB is a free API and a search can now fan
+  // out to a few dozen calls (several canonical variants per selected item).
+  async function mapWithConcurrency(items, limit, fn) {
+    const results = new Array(items.length);
+    let next = 0;
+    const workers = new Array(Math.min(limit, items.length)).fill(0).map(async () => {
+      while (next < items.length) {
+        const i = next++;
+        results[i] = await fn(items[i], i);
+      }
+    });
+    await Promise.all(workers);
+    return results;
   }
 
   // ---------- checklist ----------
@@ -2766,7 +2909,7 @@ if ("serviceWorker" in navigator) {
 
     const url = SPOONACULAR_BASE + "recipes/findByIngredients?ingredients=" +
       encodeURIComponent(selectedNames.join(",")) +
-      "&number=10&ranking=1&ignorePantry=true&apiKey=" + encodeURIComponent(key);
+      "&number=" + SPOONACULAR_RESULT_COUNT + "&ranking=1&ignorePantry=true&apiKey=" + encodeURIComponent(key);
 
     try {
       const res = await fetch(url);
@@ -2826,8 +2969,8 @@ if ("serviceWorker" in navigator) {
 
     const canonicalList = await getCanonicalIngredients();
     const mapped = selectedNames
-      .map(name => ({ name, canonical: findCanonicalIngredient(name, canonicalList) }))
-      .filter(m => m.canonical);
+      .map(name => ({ name, canonicals: findCanonicalIngredients(name, canonicalList) }))
+      .filter(m => m.canonicals.length > 0);
 
     const spoonacular = await spoonacularPromise;
     const spoonacularMatchedNames = new Set();
@@ -2842,24 +2985,56 @@ if ("serviceWorker" in navigator) {
     const unmatched = selectedNames.filter(name =>
       !mapped.some(m => m.name === name) && !stapleMatchedNames.has(name) && !spoonacularMatchedNames.has(name));
 
+    // Photo-backed API results lead; the hand-written quick recipes are a
+    // tail. With ~90 real results a search, leading with placeholder cards
+    // buried exactly what the grid is there to show.
     if (mapped.length === 0) {
-      return { recipes: [...staples, ...spoonacular.recipes], unmatched, spoonacularError: spoonacular.error };
+      return { recipes: [...spoonacular.recipes, ...staples], unmatched, spoonacularError: spoonacular.error };
     }
 
-    const perIngredient = await Promise.all(mapped.map(async m => {
-      const url = MEALDB_BASE + "filter.php?i=" + encodeURIComponent(m.canonical.replace(/\s+/g, "_"));
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        return { item: m.name, meals: data.meals || [] };
-      } catch (e) {
-        return { item: m.name, meals: [] };
+    // One filter.php call per (item, canonical variant) pair, run with a
+    // small concurrency limit rather than all at once.
+    const queries = [];
+    mapped.forEach((m, itemIdx) => {
+      m.canonicals.forEach(canonical => queries.push({ itemIdx, canonical }));
+    });
+
+    // TheMealDB throttles bursts, and a dropped filter.php call silently
+    // costs a whole ingredient's results — so retry once after a short pause
+    // before giving up on one.
+    const queryResults = await mapWithConcurrency(queries, 5, async q => {
+      const url = MEALDB_BASE + "filter.php?i=" + encodeURIComponent(q.canonical.replace(/\s+/g, "_"));
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const data = await res.json();
+          return data.meals || [];
+        } catch (e) {
+          if (attempt === 0) await new Promise(r => setTimeout(r, 400));
+        }
       }
-    }));
+      return [];
+    });
+
+    // Merge each item's variants into one deduped list, keeping variant order
+    // (exact canonical match first, then subtypes/cuts).
+    const perIngredient = mapped.map(m => ({ item: m.name, meals: [], seen: new Set() }));
+    queryResults.forEach((meals, i) => {
+      const bucket = perIngredient[queries[i].itemIdx];
+      meals.forEach(meal => {
+        if (bucket.seen.has(meal.idMeal)) return;
+        bucket.seen.add(meal.idMeal);
+        bucket.meals.push(meal);
+      });
+    });
 
     // Cap each ingredient's own contribution before merging, so one very
-    // common ingredient (e.g. chicken) can't crowd out a less common one.
-    const PER_INGREDIENT_CAP = 8;
+    // common ingredient (e.g. onion, which alone matches 250 of TheMealDB's
+    // ~790 recipes) can't crowd out a less common one. Raised from 8: the
+    // variant fan-out means real ingredients now return far more genuine
+    // matches, and ranking below keeps the best ones on top.
+    const PER_INGREDIENT_CAP = 30;
     const mealMap = new Map();
     perIngredient.forEach(({ item, meals }) => {
       meals.slice(0, PER_INGREDIENT_CAP).forEach(meal => {
@@ -2870,8 +3045,18 @@ if ("serviceWorker" in navigator) {
       });
     });
 
+    // Ranking: still primarily "uses the most of your selected items", but at
+    // this volume a tie between two 2-item matches is common, so break ties by
+    // how *specific* the matched items are. Matching salmon (8 recipes in the
+    // whole DB) says much more about a recipe than matching onion (250).
+    const itemWeight = new Map();
+    perIngredient.forEach(({ item, meals }) => {
+      itemWeight.set(item, 1 / Math.sqrt(Math.max(meals.length, 1)));
+    });
+    const specificity = r => r.matchedItems.reduce((sum, item) => sum + (itemWeight.get(item) || 0), 0);
+
     let recipes = Array.from(mealMap.values())
-      .sort((a, b) => b.matchedItems.length - a.matchedItems.length);
+      .sort((a, b) => b.matchedItems.length - a.matchedItems.length || specificity(b) - specificity(a));
 
     if (cuisine) {
       try {
@@ -2884,10 +3069,15 @@ if ("serviceWorker" in navigator) {
       }
     }
 
-    recipes = recipes.slice(0, 24);
+    // TheMealDB's free tier holds ~790 recipes total, so the old cap of 24
+    // showed about 3% of it. 90 keeps the grid responsive while surfacing far
+    // more real, photo-backed results.
+    recipes = recipes.slice(0, MAX_MEALDB_RESULTS);
 
     if (excludeTerms && excludeTerms.length > 0) {
-      const details = await Promise.all(recipes.map(r => getRecipeDetail(r.idMeal)));
+      // A failed lookup here is benign — the recipe is kept below — so no
+      // retry, just a gentle concurrency limit over what can now be 90 calls.
+      const details = await mapWithConcurrency(recipes, 4, r => getRecipeDetail(r.idMeal).catch(() => null));
       recipes = recipes.filter((r, idx) => {
         const meal = details[idx];
         if (!meal) return true;
@@ -2896,7 +3086,7 @@ if ("serviceWorker" in navigator) {
       });
     }
 
-    return { recipes: [...staples, ...spoonacular.recipes, ...recipes], unmatched, spoonacularError: spoonacular.error };
+    return { recipes: [...spoonacular.recipes, ...recipes, ...staples], unmatched, spoonacularError: spoonacular.error };
   }
 
   async function getRecipeDetail(idMeal) {
