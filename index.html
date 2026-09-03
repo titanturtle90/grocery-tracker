@@ -1040,6 +1040,11 @@ button {
       <button id="dismissBogoBanner" class="ghost-btn" type="button">Dismiss</button>
     </p>
 
+    <form id="bogoForm" class="shopping-form">
+      <input type="text" id="bogoName" placeholder="e.g. Green Giant Veggies" required>
+      <button type="submit">Add</button>
+    </form>
+
     <div class="recipe-actions" style="margin-top:8px;">
       <button id="bogoMealPrepBtn" type="button">🍳 Generate Meal Prep Ideas</button>
       <span id="bogoMealPrepStatus" class="recipe-status"></span>
@@ -3607,12 +3612,28 @@ if ("serviceWorker" in navigator) {
   const mealPrepBtn = document.getElementById("bogoMealPrepBtn");
   const mealPrepStatus = document.getElementById("bogoMealPrepStatus");
   const mealPrepResults = document.getElementById("bogoMealPrepResults");
+  const bogoForm = document.getElementById("bogoForm");
+  const bogoNameInput = document.getElementById("bogoName");
 
   const BANNER_DISMISS_KEY = "grocery-tracker-bogo-banner-dismissed";
 
   let bogoItems = [];
   let bogoCol = null;
   let dbRef = null;
+
+  function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  bogoForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = bogoNameInput.value.trim();
+    if (!name || !bogoCol) return;
+    const newItem = { id: genId(), name, addedAt: new Date().toISOString() };
+    bogoCol.doc(newItem.id).set(newItem).catch(() => {});
+    bogoForm.reset();
+    bogoNameInput.focus();
+  });
 
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, ch => ({
