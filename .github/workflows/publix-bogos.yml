@@ -1,0 +1,39 @@
+name: Publix BOGO refresh
+
+on:
+  schedule:
+    # Publix's new weekly ad starts Thursday. 10:30 UTC = 6:30 AM EDT / 5:30 AM EST.
+    - cron: "30 10 * * 4"
+    # Safety net a few hours later in case the first run hit an API hiccup.
+    - cron: "0 15 * * 4"
+  workflow_dispatch:
+    inputs:
+      zip:
+        description: "Zip code for your Publix (overrides the PUBLIX_ZIP variable)"
+        required: false
+      dry_run:
+        description: "Only print the deals, don't write to Firestore"
+        type: boolean
+        default: false
+
+concurrency:
+  group: publix-bogos
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fetch this week's BOGOs and sync to Firestore
+        env:
+          PUBLIX_ZIP: ${{ inputs.zip || vars.PUBLIX_ZIP }}
+          PUBLIX_AD_URL: ${{ vars.PUBLIX_AD_URL }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID || 'grocery-tracker-b45f1' }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node scripts/fetch-publix-bogos.mjs ${{ inputs.dry_run && '--dry-run' || '' }}
