@@ -135,13 +135,18 @@
     listEl.innerHTML = ""; listEl.appendChild(frag);
   }
 
+  // Nearly every deal is a plain "Buy 1 get 1 free" — the BOGO tab already
+  // says that once at the top, so repeating it on every single row is just
+  // noise. Only call it out here when it's the rarer variant (e.g. "Buy 2
+  // get 1 free"), and give the freed-up space to a larger item name instead.
+  const STANDARD_NOTE = "buy 1 get 1 free";
   function row(d) {
     const onList = global.Shopping && Shopping.has(d.name);
     const meta = [];
-    if (d.note) meta.push(`<span class="pill accent">${esc(d.note)}</span>`);
+    if (d.note && d.note.trim().toLowerCase() !== STANDARD_NOTE) meta.push(`<span class="pill accent">${esc(d.note)}</span>`);
     if (d.price) meta.push(`<span class="price">${esc(d.price)}</span>`);
     if (d.description) meta.push(`<span>${esc(d.description)}</span>`);
-    const el = App.el(`<div class="item" data-id="${d.id}">
+    const el = App.el(`<div class="item bogo-item" data-id="${d.id}">
       <span class="lead">${d.imageUrl ? `<img class="deal-img" src="${esc(d.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">` : (CAT_EMOJI[catOf(d)] || "🏷️")}</span>
       <span class="body"><span class="title">${esc(d.name)}</span><span class="meta">${meta.join("")}</span></span>
       <button class="icon-btn ${onList ? "on" : "accent"}" type="button" data-add aria-label="Add to shopping list">${icon(onList ? "check" : "plus")}</button>

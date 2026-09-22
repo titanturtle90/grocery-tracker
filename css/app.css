@@ -102,7 +102,6 @@ svg.ic.lg { width: 24px; height: 24px; }
 .app { max-width: 680px; margin: 0 auto; padding: 0 16px calc(var(--nav-h) + var(--safe-b) + 24px); min-height: 100vh; }
 
 .topbar {
-  position: sticky; top: 0; z-index: 30;
   margin: 0 -16px; padding: calc(10px + var(--safe-t)) 16px 8px;
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px);
@@ -202,7 +201,7 @@ input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
 
 /* ---------- chips ---------- */
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.chips.scroll { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.chips.scroll { flex-wrap: nowrap; overflow-x: auto; margin-left: -16px; margin-right: -16px; padding: 2px 16px 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .chips.scroll::-webkit-scrollbar { display: none; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 13px; border-radius: 999px;
@@ -259,6 +258,9 @@ input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
 .item .lead.expired { background: var(--red-soft); } .item .lead.today { background: var(--orange-soft); } .item .lead.soon { background: var(--yellow-soft); } .item .lead.fresh { background: var(--green-soft); }
 .item .body { flex: 1; min-width: 0; }
 .item .title { font-weight: 600; font-size: 0.96rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* BOGO rows drop the redundant "Buy 1 get 1 free" pill most items carry
+   (the tab already says BOGO once) — give that space to a bigger name. */
+.item.bogo-item .title { font-size: 1.08rem; line-height: 1.3; }
 .item .meta { font-size: 0.78rem; color: var(--text-3); margin-top: 3px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .item .meta .sep { opacity: 0.5; }
 .item .trail { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
@@ -454,13 +456,17 @@ input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
 .tile-g7 { background: linear-gradient(135deg, #fbcfe8, #ec4899); } .tile-g8 { background: linear-gradient(135deg, #c7d2fe, #6366f1); }
 .rgrid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 560px) { .rgrid { grid-template-columns: 1fr 1fr; } }
-.carousel { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 4px 16px 10px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+/* Right-bleed only (no left padding) — a scroll-snap container with left
+   padding gets auto-scrolled past that padding on load in some browsers,
+   which visually cancels the inset and left-aligns the first card flush
+   with the screen edge instead of matching the page's own margin. */
+.carousel { display: flex; gap: 10px; overflow-x: auto; margin-right: -16px; padding: 4px 16px 10px 0; scroll-snap-type: x mandatory; scrollbar-width: none; }
 .carousel::-webkit-scrollbar { display: none; }
 .carousel .rcard { flex: 0 0 82%; max-width: 320px; scroll-snap-align: start; flex-direction: column; gap: 10px; }
 .carousel .rcard .tile { width: 100%; height: 110px; }
 
 .picker-bar {
-  position: sticky; top: calc(58px + var(--safe-t)); z-index: 25; margin: 8px -16px 0; padding: 8px 16px 10px;
+  position: sticky; top: var(--safe-t); z-index: 25; margin: 8px -16px 0; padding: 8px 16px 10px;
   background: color-mix(in srgb, var(--bg) 86%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
 }
 .picker-bar .card { padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
@@ -528,6 +534,7 @@ input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
 .tag-row { display: flex; gap: 6px; flex-wrap: wrap; }
 @media (min-width: 720px) {
   .app { padding-left: 24px; padding-right: 24px; }
-  .topbar, .chips.scroll, .carousel, .picker-bar { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
+  .topbar, .chips.scroll, .picker-bar { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
+  .carousel { margin-right: -24px; padding-right: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
