@@ -63,9 +63,27 @@ function normalizeName(name) {
   return String(name || "").replace(/\s+/g, " ").replace(/\s*(bogo|buy one get one free|buy 1 get 1 free)\s*/gi, " ").trim();
 }
 
+// Publix's ad on Flipp includes a parallel Spanish-language listing for many
+// items in bilingual markets — "Bertolli Olive Oil" and "Aceite de Oliva
+// Bertolli" both show up as separate items for the same real-world deal.
+// There's no clean id linking the two, so we detect and drop the Spanish
+// copy on the assumption its English twin is already in (or will be found
+// in) the results. Heuristic, not a dictionary — tuned against a real
+// week's data (see the note above fetchFlippDeals) rather than exhaustive.
+const SPANISH_RE = new RegExp(
+  "[áéíóúÁÉÍÓÚ¿¡]" +
+  "|\\b(?:de|con|para|del|las|los|sin)\\b" +
+  "|\\b(?:almuerzo|bombillos?|caldo|cerdo|desmenuzad[oa]|instantane[oa]|importad[oa]|pollo|leche|arroz|queso|carnes?|fr[ií]os?)\\b",
+  "i"
+);
+function looksSpanish(item) {
+  return SPANISH_RE.test(item.name || "") || SPANISH_RE.test(item.description || "");
+}
+
 async function fetchFlippDeals(zip) {
   const queries = ["bogo", "buy 1 get 1", "buy one get one", "free", "publix"];
   const seen = new Map();
+  let skippedSpanish = 0;
   for (const q of queries) {
     const url = `${FLIPP_SEARCH}?locale=en-us&postal_code=${encodeURIComponent(zip)}&q=${encodeURIComponent(q)}`;
     try {
@@ -75,6 +93,7 @@ async function fetchFlippDeals(zip) {
       for (const it of items) {
         const note = classify(it);
         if (!note) continue;
+        if (looksSpanish(it)) { skippedSpanish++; continue; }
         const key = normalizeName(it.name).toLowerCase();
         if (!key || seen.has(key)) continue;
         seen.set(key, {
@@ -93,6 +112,7 @@ async function fetchFlippDeals(zip) {
       log(`flipp q="${q}" failed: ${e.message}`);
     }
   }
+  if (skippedSpanish) log(`skipped ${skippedSpanish} Spanish-language duplicate listing(s)`);
   return Array.from(seen.values());
 }
 
