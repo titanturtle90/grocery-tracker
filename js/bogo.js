@@ -28,6 +28,13 @@
   const CAT_EMOJI = { "Produce": "🥬", "Deli": "🥪", "Bakery": "🥐", "Meat": "🥩", "Seafood": "🦐", "Dairy": "🥛", "Frozen Food": "🧊", "Beverages": "🧃", "Beer & Wine": "🍷", "Liquor": "🥃", "Health & Nutrition": "💊", "Baby": "🍼", "Beauty & Personal Care": "🧴", "Pet": "🐾", "Housewares": "🏠", "Non-Foods": "🧽", "Grocery": "🛒" };
 
   function catOf(d) { return d.category || (global.BogoCategories ? BogoCategories.lookup(d.name) : "Grocery"); }
+  // Publix's own weekly-ad text marks most items with a trailing * or †
+  // pointing to fine print elsewhere in the ad (selected sizes, while
+  // supplies last, etc.) that never made it into the scraped data — with
+  // no footnote key to show, it's just clutter here. Strip it for display
+  // and anywhere the name gets reused (shopping list, kitchen); the raw
+  // name from Firestore is untouched.
+  function cleanName(name) { return String(name || "").replace(/[\s,*†‡]+$/, ""); }
   function weekKey() { return meta && meta.updatedAt ? meta.updatedAt.slice(0, 10) : (deals[0] && deals[0].addedAt ? deals[0].addedAt.slice(0, 10) : ""); }
 
   function init() {
@@ -141,14 +148,15 @@
   // get 1 free"), and give the freed-up space to a larger item name instead.
   const STANDARD_NOTE = "buy 1 get 1 free";
   function row(d) {
-    const onList = global.Shopping && Shopping.has(d.name);
+    const name = cleanName(d.name);
+    const onList = global.Shopping && Shopping.has(name);
     const meta = [];
     if (d.note && d.note.trim().toLowerCase() !== STANDARD_NOTE) meta.push(`<span class="pill accent">${esc(d.note)}</span>`);
     if (d.price) meta.push(`<span class="price">${esc(d.price)}</span>`);
     if (d.description) meta.push(`<span>${esc(d.description)}</span>`);
     const el = App.el(`<div class="item bogo-item" data-id="${d.id}">
       <span class="lead">${d.imageUrl ? `<img class="deal-img" src="${esc(d.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">` : (CAT_EMOJI[catOf(d)] || "🏷️")}</span>
-      <span class="body"><span class="title">${esc(d.name)}</span><span class="meta">${meta.join("")}</span></span>
+      <span class="body"><span class="title">${esc(name)}</span><span class="meta">${meta.join("")}</span></span>
       <button class="icon-btn ${onList ? "on" : "accent"}" type="button" data-add aria-label="Add to shopping list">${icon(onList ? "check" : "plus")}</button>
     </div>`);
     el.querySelector("[data-add]").addEventListener("click", e => { e.stopPropagation(); addToList(d, el.querySelector("[data-add]")); });
@@ -158,13 +166,15 @@
 
   function addToList(d, btn) {
     if (!global.Shopping) return;
-    const added = Shopping.add(d.name, "", { note: "BOGO" });
+    const name = cleanName(d.name);
+    const added = Shopping.add(name, "", { note: "BOGO" });
     App.haptic();
-    if (added) { App.toast(`${d.name} added to shopping.`); if (btn) { btn.classList.remove("accent"); btn.classList.add("on"); btn.innerHTML = icon("check"); } }
-    else App.toast(`${d.name} is already on your list.`);
+    if (added) { App.toast(`${name} added to shopping.`); if (btn) { btn.classList.remove("accent"); btn.classList.add("on"); btn.innerHTML = icon("check"); } }
+    else App.toast(`${name} is already on your list.`);
   }
 
   function openDetail(d) {
+    const name = cleanName(d.name);
     const keys = global.Ingredients ? Ingredients.keysFor(d.name).filter(k => !Ingredients.isStaple(k)) : [];
     const body = App.el(`<div>
       ${d.imageUrl ? `<div class="rhero" style="background:#fff;height:160px"><img src="${esc(d.imageUrl)}" alt="" style="object-fit:contain"></div>` : ""}
@@ -187,10 +197,10 @@
       const b = e.target.closest("[data-a]"); if (!b) return;
       if (b.dataset.a === "add") { addToList(d); App.sheet.close(); }
       if (b.dataset.a === "cook") { App.sheet.close(); if (global.Recipes) Recipes.openWithKeys(keys, { source: "bogo" }); }
-      if (b.dataset.a === "kitchen") { App.sheet.close(); if (global.Groceries) Groceries.openForm(null, { name: d.name, qty: "2" }); }
-      if (b.dataset.a === "del") { App.sheet.close(); col.doc(d.id).delete().catch(() => {}); App.toast(`Hid ${d.name}.`, { label: "Undo", onClick: () => col.doc(d.id).set(d) }); }
+      if (b.dataset.a === "kitchen") { App.sheet.close(); if (global.Groceries) Groceries.openForm(null, { name, qty: "2" }); }
+      if (b.dataset.a === "del") { App.sheet.close(); col.doc(d.id).delete().catch(() => {}); App.toast(`Hid ${name}.`, { label: "Undo", onClick: () => col.doc(d.id).set(d) }); }
     });
-    App.sheet.open({ title: d.name, body });
+    App.sheet.open({ title: name, body });
   }
 
   // Recipes that use this week's deals, shown as a carousel above the list.
@@ -224,7 +234,7 @@
         const batch = App.batch(); deals.forEach(d => batch.delete(col.doc(d.id))); batch.commit();
       }
       if (b.dataset.a === "addall") {
-        let n = 0; deals.forEach(d => { if (Ingredients.keysFor(d.name).some(k => !Ingredients.isStaple(k)) && Shopping.add(d.name, "", { note: "BOGO" })) n++; });
+        let n = 0; deals.forEach(d => { if (Ingredients.keysFor(d.name).some(k => !Ingredients.isStaple(k)) && Shopping.add(cleanName(d.name), "", { note: "BOGO" })) n++; });
         App.toast(`Added ${App.plural(n, "deal")} to your shopping list.`);
       }
     });
