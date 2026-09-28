@@ -1,10 +1,10 @@
-const CACHE_NAME = "grocery-glance-v20";
+const CACHE_NAME = "grocery-glance-v21";
 const PRECACHE_URLS = [
   "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png",
-  "./css/app.css?v=20",
-  "./js/data/shelf-life.js?v=20", "./js/data/store-sections.js?v=20", "./js/data/bogo-categories.js?v=20", "./js/data/grocery-categories.js?v=20",
-  "./js/data/ingredients.js?v=20", "./js/data/recipes-a.js?v=20", "./js/data/recipes-b.js?v=20", "./js/data/recipes-c.js?v=20",
-  "./js/core.js?v=20", "./js/groceries.js?v=20", "./js/shopping.js?v=20", "./js/recipe-engine.js?v=20", "./js/bogo.js?v=20", "./js/recipes.js?v=20", "./js/app.js?v=20"
+  "./css/app.css?v=21",
+  "./js/data/shelf-life.js?v=21", "./js/data/store-sections.js?v=21", "./js/data/bogo-categories.js?v=21", "./js/data/grocery-categories.js?v=21",
+  "./js/data/ingredients.js?v=21", "./js/data/recipes-a.js?v=21", "./js/data/recipes-b.js?v=21", "./js/data/recipes-c.js?v=21",
+  "./js/core.js?v=21", "./js/groceries.js?v=21", "./js/shopping.js?v=21", "./js/recipe-engine.js?v=21", "./js/bogo.js?v=21", "./js/recipes.js?v=21", "./js/app.js?v=21"
 ];
 
 self.addEventListener("install", event => {
@@ -29,10 +29,14 @@ self.addEventListener("fetch", event => {
   }
 
   // Same-origin assets: cache-first, refresh in the background (stale-while-revalidate).
+  // The background refetch bypasses the browser's own HTTP cache (cache: "reload") —
+  // otherwise a same-URL asset (e.g. a ?v=NN file whose content changed without a
+  // version bump) could keep "refreshing" from an equally-stale HTTP cache entry
+  // and never actually pick up what's on the server.
   if (url.origin === location.origin) {
     event.respondWith(
       caches.match(req).then(cached => {
-        const network = fetch(req).then(res => {
+        const network = fetch(req, { cache: "reload" }).then(res => {
           if (res && res.ok) caches.open(CACHE_NAME).then(c => c.put(req, res.clone()));
           return res;
         }).catch(() => cached);

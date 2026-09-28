@@ -163,6 +163,10 @@ svg.ic.lg { width: 24px; height: 24px; }
   background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   color: var(--text); outline: none; transition: border-color 0.15s, box-shadow 0.15s;
   -webkit-appearance: none; appearance: none;
+  /* iOS Safari auto-zooms the whole page on focus for any text input under
+     16px — this is the browser's own accessibility behavior, not something
+     to fight with viewport meta tricks. Matching its threshold is the fix. */
+  font-size: 16px;
 }
 .input::placeholder { color: var(--text-3); }
 .input:focus, .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.18); }
@@ -178,7 +182,7 @@ input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm);
 }
 .search .ic { color: var(--text-3); }
-.search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; min-height: 44px; }
+.search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; min-height: 44px; font-size: 16px; }
 .search input::placeholder { color: var(--text-3); }
 .search .clear { display: none; }
 .search.has-value .clear { display: inline-flex; }
