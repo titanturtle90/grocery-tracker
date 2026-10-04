@@ -177,7 +177,7 @@
     const name = cleanName(d.name);
     const keys = global.Ingredients ? Ingredients.keysFor(d.name).filter(k => !Ingredients.isStaple(k)) : [];
     const body = App.el(`<div>
-      ${d.imageUrl ? `<div class="rhero" style="background:#fff;height:160px"><img src="${esc(d.imageUrl)}" alt="" style="object-fit:contain"></div>` : ""}
+      ${d.imageUrl ? `<div class="rhero" style="background:#fff;height:160px"><img src="${esc(d.imageUrl)}" alt="" style="object-fit:cover;object-position:center 44%"></div>` : ""}
       <div class="rmeta">
         <span class="pill accent">${esc(d.note || "Buy 1 get 1 free")}</span>
         ${d.price ? `<span class="pill">${esc(d.price)}</span>` : ""}

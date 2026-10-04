@@ -538,7 +538,14 @@ input[type="date"].input::-webkit-date-and-time-value { text-align: left; }
 .mt-8 { margin-top: 8px; } .mt-12 { margin-top: 12px; } .mt-16 { margin-top: 16px; } .mt-24 { margin-top: 24px; }
 .divider { height: 1px; background: var(--border); margin: 14px 0; }
 .offline-note { text-align: center; font-size: 0.78rem; color: var(--text-3); padding: 8px; }
-.deal-img { width: 42px; height: 42px; object-fit: contain; background: #fff; border-radius: 10px; }
+/* Flipp's deal photos are the whole ad tile — badge, price, and product
+   baked into one image, not separate layers we can hide. Plain
+   object-fit:cover barely crops anything at this aspect ratio (the tile
+   is much taller than it is wide relative to this square), so the badge
+   and price panel both stayed visible, just shrunk. Scaling past "cover"
+   zooms into the product band itself; .lead's own overflow:hidden clips
+   the overflow, so the visible thumbnail size is unaffected. */
+.deal-img { width: 42px; height: 42px; object-fit: cover; object-position: center 25%; transform: scale(1.6); background: #fff; border-radius: 10px; }
 .price { font-weight: 800; font-family: var(--font-heading); }
 .strike { text-decoration: line-through; opacity: 0.6; font-weight: 500; }
 .tag-row { display: flex; gap: 6px; flex-wrap: wrap; }
