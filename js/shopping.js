@@ -25,6 +25,16 @@
   const SECTION_ORDER = global.StoreSections ? StoreSections.SECTION_ORDER : [];
   const norm = s => String(s || "").trim().toLowerCase();
 
+  // How checking an item off picks its kitchen details: "quick" moves it in
+  // instantly with the shelf-life estimate (today's default, unchanged);
+  // "ask" opens the add-to-kitchen form pre-filled with that same estimate
+  // so you can glance at or correct the date, quantity, etc. before it's
+  // saved. Either way, the item detail sheet always offers both as explicit
+  // buttons, regardless of this default.
+  const PICKUP_MODE_KEY = "gg-pickup-mode";
+  function pickupMode() { return App.lsGet(PICKUP_MODE_KEY, "quick"); }
+  function setPickupMode(m) { App.lsSet(PICKUP_MODE_KEY, m); }
+
   function memory() { return App.lsGet(MEMORY_KEY, {}); }
   function remember(name, loc) { const m = memory(); if (loc) m[norm(name)] = loc; else delete m[norm(name)]; App.lsSet(MEMORY_KEY, m); }
   function guessLocation(name) { return memory()[norm(name)] || (global.StoreSections && StoreSections.lookup(name)) || ""; }
@@ -91,7 +101,9 @@
     return el;
   }
 
-  function pickUp(item, el) {
+  // Fast path: move the item into the kitchen instantly using the shelf-life
+  // estimate, no form. This is what checking an item off has always done.
+  function quickPickUp(item, el) {
     if (!col) return;
     App.haptic(12);
     if (el) el.classList.add("checked");
@@ -102,6 +114,25 @@
     const grocery = { id: App.genId(), name: item.name, qty: item.qty || "", category: (global.GroceryCategories && GroceryCategories.lookup(item.name)) || "Other", storage, expiry: App.addDays(days), noExpiration: false, openedAt: null, addedAt: new Date().toISOString() };
     if (global.Groceries) Groceries.upsert(grocery).catch(() => {});
     App.toast(`${item.name} → kitchen${match ? ` (${days}-day shelf life)` : ""}`, { label: "Undo", onClick: () => { col.doc(item.id).set(item).catch(() => {}); if (global.Groceries) Groceries.remove(grocery.id).catch(() => {}); } });
+  }
+
+  // Slower path: open the same add-to-kitchen form used everywhere else,
+  // pre-filled with this item's name/qty — which already fills in the
+  // shelf-life-estimated expiry, category, and storage, so it's a glance-
+  // and-confirm for most items and a real edit for the ones where the
+  // estimate is wrong (opened a jar, different size, etc.). The shopping-
+  // list entry is removed only once the kitchen item is actually saved.
+  function askPickUp(item) {
+    if (!col || !global.Groceries) return;
+    App.haptic(8);
+    Groceries.openForm(null, { name: item.name, qty: item.qty || "", onDone: () => { col.doc(item.id).delete().catch(() => {}); } });
+  }
+
+  // Checking an item off (the checkbox tap) follows whichever mode is set
+  // in Shopping's "..." menu; the item detail sheet always offers both.
+  function pickUp(item, el) {
+    if (pickupMode() === "ask") askPickUp(item);
+    else quickPickUp(item, el);
   }
 
   function setLocation(item, loc) {
@@ -127,7 +158,8 @@
     const body = App.el(`<div>
       <div class="hint">${item.qty ? esc(item.qty) + " · " : ""}${esc(item.location || "No location set")}${item.note ? " · " + esc(item.note) : ""}</div>
       <div class="action-grid mt-16">
-        <button class="act accent" data-act="got" type="button">${icon("check")}Got it</button>
+        <button class="act accent" data-act="quick" type="button">${icon("check")}Quick add</button>
+        <button class="act accent" data-act="ask" type="button">${icon("clock")}Set expiry</button>
         <button class="act" data-act="loc" type="button">${icon("store")}Aisle</button>
         <button class="act" data-act="qty" type="button">${icon("edit")}Qty</button>
         <button class="act danger" data-act="del" type="button">${icon("trash")}Remove</button>
@@ -135,7 +167,8 @@
     </div>`);
     body.addEventListener("click", e => {
       const b = e.target.closest("[data-act]"); if (!b) return;
-      if (b.dataset.act === "got") { App.sheet.close(); pickUp(item); }
+      if (b.dataset.act === "quick") { App.sheet.close(); quickPickUp(item); }
+      if (b.dataset.act === "ask") { App.sheet.close(); askPickUp(item); }
       if (b.dataset.act === "loc") pickLocation(item);
       if (b.dataset.act === "del") { App.sheet.close(); col.doc(item.id).delete().catch(() => {}); App.toast(`Removed ${item.name}.`, { label: "Undo", onClick: () => col.doc(item.id).set(item) }); }
       if (b.dataset.act === "qty") {
@@ -168,7 +201,7 @@
       const b = e.target.closest("[data-b]"); if (!b) return;
       const picked = list.filter(i => selected.has(i.id));
       if (b.dataset.b === "loc") pickLocation({ name: `${picked.length} items`, location: "" }, v => { const batch = App.batch(); picked.forEach(i => { batch.set(col.doc(i.id), { location: v }, { merge: true }); remember(i.name, v); }); batch.commit(); setSelectMode(false); });
-      if (b.dataset.b === "got") { picked.forEach(i => pickUp(i)); setSelectMode(false); }
+      if (b.dataset.b === "got") { picked.forEach(i => quickPickUp(i)); setSelectMode(false); }
       if (b.dataset.b === "del") { if (await App.confirm({ title: `Remove ${picked.length} items?`, okLabel: "Remove", danger: true })) { const batch = App.batch(); picked.forEach(i => batch.delete(col.doc(i.id))); batch.commit(); setSelectMode(false); } }
     });
     document.body.appendChild(actionbar);
@@ -185,10 +218,28 @@
   });
   selectBtn.addEventListener("click", () => setSelectMode(!selectMode));
   moreBtn.addEventListener("click", () => {
-    const body = App.el(`<div class="list tight">
-      <button class="item" type="button" data-a="restock"><span class="lead">↩️</span><span class="body"><span class="title">Restock expired items</span><span class="meta">Add everything expired in your kitchen to this list</span></span></button>
-      <button class="item" type="button" data-a="clear"><span class="lead">🗑️</span><span class="body"><span class="title">Clear the whole list</span></span></button>
+    const askHint = "Checking something off opens the add-to-kitchen form, pre-filled with a shelf-life estimate — a glance-and-confirm for most items, a real edit when the estimate's wrong.";
+    const quickHint = "Checking something off adds it to the kitchen instantly, using a shelf-life estimate for the expiration date.";
+    const body = App.el(`<div>
+      <div class="sheet-section" style="margin-top:0">
+        <h3>Checking items off</h3>
+        <label class="switch" style="display:flex;justify-content:space-between;padding:8px 2px">
+          <span>Ask for expiration first</span>
+          <input type="checkbox" id="pickupModeToggle" ${pickupMode() === "ask" ? "checked" : ""}>
+          <span class="track"></span>
+        </label>
+        <p class="hint" id="pickupModeHint">${pickupMode() === "ask" ? askHint : quickHint}</p>
+        <p class="hint">Either way, tapping an item itself always offers both Quick add and Set expiry.</p>
+      </div>
+      <div class="list tight mt-16">
+        <button class="item" type="button" data-a="restock"><span class="lead">↩️</span><span class="body"><span class="title">Restock expired items</span><span class="meta">Add everything expired in your kitchen to this list</span></span></button>
+        <button class="item" type="button" data-a="clear"><span class="lead">🗑️</span><span class="body"><span class="title">Clear the whole list</span></span></button>
+      </div>
     </div>`);
+    body.querySelector("#pickupModeToggle").addEventListener("change", e => {
+      setPickupMode(e.target.checked ? "ask" : "quick");
+      body.querySelector("#pickupModeHint").textContent = e.target.checked ? askHint : quickHint;
+    });
     body.addEventListener("click", async e => {
       const b = e.target.closest("[data-a]"); if (!b) return;
       App.sheet.close();
