@@ -84,8 +84,8 @@
   App.sortKey = item => App.effectiveExpiry(item) || "9999-12-31";
   App.storageLabel = v => { const o = (global.ShelfLifeDB?.STORAGE_OPTIONS || []).find(x => x.value === v); return o ? `${o.icon} ${o.label}` : (v || ""); };
   App.storageIcon = v => { const o = (global.ShelfLifeDB?.STORAGE_OPTIONS || []).find(x => x.value === v); return o ? o.icon : "🧊"; };
-  App.CATEGORIES = ["Produce", "Dairy", "Meat & Seafood", "Bakery", "Frozen", "Pantry", "Beverages", "Leftovers", "Other"];
-  App.CATEGORY_EMOJI = { "Produce": "🥬", "Dairy": "🥛", "Meat & Seafood": "🥩", "Bakery": "🍞", "Frozen": "🧊", "Pantry": "🥫", "Beverages": "🧃", "Leftovers": "🍱", "Other": "🛒" };
+  App.CATEGORIES = ["Produce", "Dairy", "Meat & Seafood", "Bakery", "Fridge", "Frozen", "Pantry", "Beverages", "Leftovers", "Other"];
+  App.CATEGORY_EMOJI = { "Produce": "🥬", "Dairy": "🥛", "Meat & Seafood": "🥩", "Bakery": "🍞", "Fridge": "🫙", "Frozen": "🧊", "Pantry": "🥫", "Beverages": "🧃", "Leftovers": "🍱", "Other": "🛒" };
   App.itemEmoji = item => {
     const keys = global.Ingredients ? Ingredients.keysFor(item.name) : [];
     if (keys.length) return Ingredients.emoji(keys[0]);
