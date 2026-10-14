@@ -9,7 +9,10 @@
 
   let items = [];
   let col = null;
-  const state = { search: "", category: "", storage: "", urgency: "", sort: "status" };
+  const SORTS = ["status", "expiry", "alpha"]; // default (by urgency) | by date | A–Z within categories
+  const savedSort = App.lsGet("gg:kitchenSort", "status");
+  const state = { search: "", category: "", storage: "", urgency: "", sort: SORTS.includes(savedSort) ? savedSort : "status" };
+  const setSort = v => { state.sort = v; App.lsSet("gg:kitchenSort", v); };
   let selectMode = false;
   const selected = new Set();
 
@@ -86,7 +89,8 @@
   function renderFilters() {
     const cats = Array.from(new Set(items.map(i => i.category || "Other"))).sort((a, b) => App.CATEGORIES.indexOf(a) - App.CATEGORIES.indexOf(b));
     const storages = (global.ShelfLifeDB?.STORAGE_OPTIONS || []).filter(o => items.some(i => i.storage === o.value));
-    let html = `<button class="chip ${state.sort === "expiry" ? "on" : ""}" data-sort type="button">${icon("clock", "sm")} By date</button>`;
+    let html = `<button class="chip ${state.sort === "expiry" ? "on" : ""}" data-sort="expiry" type="button">${icon("clock", "sm")} By date</button>`;
+    html += `<button class="chip ${state.sort === "alpha" ? "on" : ""}" data-sort="alpha" type="button" title="Group by category, A to Z">${icon("filter", "sm")} A–Z</button>`;
     html += cats.map(c => `<button class="chip ${state.category === c ? "on" : ""}" data-cat="${esc(c)}" type="button"><span class="em">${App.CATEGORY_EMOJI[c] || "🛒"}</span>${esc(c)}</button>`).join("");
     html += storages.map(o => `<button class="chip ${state.storage === o.value ? "on" : ""}" data-storage="${o.value}" type="button"><span class="em">${o.icon}</span>${o.label}</button>`).join("");
     if (state.category || state.storage || state.urgency || state.search || state.sort !== "status") html += `<button class="chip" data-clear type="button">${icon("x", "sm")} Clear</button>`;
@@ -132,6 +136,19 @@
       const wrap = App.el(`<div class="list"></div>`);
       [...list].sort(byDate).forEach(i => wrap.appendChild(row(i)));
       frag.appendChild(wrap);
+    } else if (state.sort === "alpha") {
+      // Grouped by category (not by how soon things expire), alphabetical inside each category.
+      const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) || byDate(a, b);
+      const known = new Set(App.CATEGORIES);
+      const extra = Array.from(new Set(list.map(i => i.category || "Other"))).filter(c => !known.has(c)).sort((a, b) => a.localeCompare(b));
+      App.CATEGORIES.concat(extra).forEach(cat => {
+        const ci = list.filter(i => (i.category || "Other") === cat).sort(byName);
+        if (!ci.length) return;
+        if (!state.category) frag.appendChild(App.el(`<h2 class="group-title"><span class="em">${App.CATEGORY_EMOJI[cat] || "🛒"}</span>${esc(cat)}<span class="n">${ci.length}</span></h2>`));
+        const wrap = App.el(`<div class="list"></div>`);
+        ci.forEach(i => wrap.appendChild(row(i)));
+        frag.appendChild(wrap);
+      });
     } else {
       GROUPS.forEach(g => {
         const gi = list.filter(i => urgency(i) === g.key).sort(byDate);
@@ -389,10 +406,10 @@
   });
   filtersEl.addEventListener("click", e => {
     const c = e.target.closest(".chip"); if (!c) return;
-    if (c.hasAttribute("data-sort")) state.sort = state.sort === "expiry" ? "status" : "expiry";
+    if (c.hasAttribute("data-sort")) setSort(state.sort === c.dataset.sort ? "status" : c.dataset.sort);
     else if (c.dataset.cat != null) state.category = state.category === c.dataset.cat ? "" : c.dataset.cat;
     else if (c.dataset.storage != null) state.storage = state.storage === c.dataset.storage ? "" : c.dataset.storage;
-    else if (c.hasAttribute("data-clear")) { Object.assign(state, { search: "", category: "", storage: "", urgency: "", sort: "status" }); searchEl.value = ""; searchEl.dispatchEvent(new Event("input")); }
+    else if (c.hasAttribute("data-clear")) { Object.assign(state, { search: "", category: "", storage: "", urgency: "" }); setSort("status"); searchEl.value = ""; searchEl.dispatchEvent(new Event("input")); }
     render();
   });
   selectBtn.addEventListener("click", () => setSelectMode(!selectMode));

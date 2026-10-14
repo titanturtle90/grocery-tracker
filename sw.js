@@ -1,10 +1,10 @@
-const CACHE_NAME = "grocery-glance-v24";
+const CACHE_NAME = "grocery-glance-v25";
 const PRECACHE_URLS = [
   "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png",
-  "./css/app.css?v=24",
-  "./js/data/shelf-life.js?v=24", "./js/data/store-sections.js?v=24", "./js/data/bogo-categories.js?v=24", "./js/data/grocery-categories.js?v=24",
-  "./js/data/ingredients.js?v=24", "./js/data/recipes-a.js?v=24", "./js/data/recipes-b.js?v=24", "./js/data/recipes-c.js?v=24",
-  "./js/core.js?v=24", "./js/groceries.js?v=24", "./js/shopping.js?v=24", "./js/recipe-engine.js?v=24", "./js/bogo.js?v=24", "./js/recipes.js?v=24", "./js/app.js?v=24"
+  "./css/app.css?v=25",
+  "./js/data/shelf-life.js?v=25", "./js/data/store-sections.js?v=25", "./js/data/bogo-categories.js?v=25", "./js/data/grocery-categories.js?v=25",
+  "./js/data/ingredients.js?v=25", "./js/data/recipes-a.js?v=25", "./js/data/recipes-b.js?v=25", "./js/data/recipes-c.js?v=25",
+  "./js/core.js?v=25", "./js/groceries.js?v=25", "./js/shopping.js?v=25", "./js/recipe-engine.js?v=25", "./js/bogo.js?v=25", "./js/recipes.js?v=25", "./js/app.js?v=25"
 ];
 
 self.addEventListener("install", event => {
