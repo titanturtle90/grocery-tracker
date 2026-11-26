@@ -120,7 +120,6 @@ svg.ic.lg { width: 24px; height: 24px; }
 .topbar .brand-sub .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); }
 .topbar .brand-sub.synced .dot { background: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.2); }
 .topbar .brand-sub.error .dot { background: var(--red); }
-.topbar .actions { display: flex; gap: 6px; }
 
 .page-head { padding: 12px 0 14px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .page-head h1 { font-size: 1.9rem; font-weight: 800; line-height: 1.05; }

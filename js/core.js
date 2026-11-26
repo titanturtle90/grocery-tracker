@@ -245,26 +245,5 @@
     sync();
   });
 
-  // ---------- notifications (fire while app is open) ----------
-  const notifyBtn = document.getElementById("notifyBtn");
-  const notificationsSupported = "Notification" in window && "serviceWorker" in navigator;
-  App.updateNotifyBtn = () => {
-    if (!notificationsSupported || !notifyBtn) return;
-    notifyBtn.hidden = Notification.permission !== "default";
-  };
-  if (notificationsSupported && notifyBtn) {
-    App.updateNotifyBtn();
-    notifyBtn.addEventListener("click", async () => {
-      const perm = await Notification.requestPermission();
-      App.updateNotifyBtn();
-      App.toast(perm === "granted" ? "Alerts on — you'll be reminded when something's expiring." : "Alerts not enabled.");
-      if (perm === "granted") App.emit("notify-check", true);
-    });
-  }
-  App.notify = (title, body, tag) => {
-    if (!notificationsSupported || Notification.permission !== "granted") return;
-    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, { body, icon: "icon-192.png", badge: "icon-192.png", tag })).catch(() => {});
-  };
-
   global.App = App;
 })(window);

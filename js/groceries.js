@@ -46,27 +46,11 @@
       App.setSynced();
       render();
       App.emit("groceries", items);
-      checkNotifications(false);
     }, err => {
       console.error("groceryItems sync error", err);
       App.setSyncError("Sync error");
     });
   }
-
-  // ---------- notifications ----------
-  const NOTIFY_KEY = "grocery-tracker-last-notify-date";
-  function checkNotifications(force) {
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
-    const today = App.todayStr();
-    if (!force && localStorage.getItem(NOTIFY_KEY) === today) return;
-    const urgent = items.filter(i => ["expired", "today"].includes(urgency(i)));
-    if (!urgent.length) return;
-    localStorage.setItem(NOTIFY_KEY, today);
-    const names = urgent.slice(0, 3).map(i => i.name).join(", ");
-    const extra = urgent.length > 3 ? ` +${urgent.length - 3} more` : "";
-    App.notify("Grocery Glance", `${names}${extra} — expired or due today.`, "grocery-expiry");
-  }
-  App.on("notify-check", () => checkNotifications(true));
 
   // ---------- rendering ----------
   function render() {
