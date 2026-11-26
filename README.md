@@ -60,10 +60,6 @@ The script exits non-zero if it finds zero deals, so a failed scrape shows up as
 
 Apply `firestore.rules` in the Firebase console. The two new collections (`recipeFavorites`, `meta`) need rules just like the existing ones; without them favorites fall back to this device only and the BOGO "last updated" banner stays blank.
 
-## Notifications
-
-Expiry alerts fire when you open the app (there's no server). Tap the bell in the header to enable them.
-
 ## Development
 
 Everything is static — open `index.html` from any local web server:
